@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+from collections import Counter
 
 class GetSentences(object):
     
@@ -28,10 +29,10 @@ class KaggleDataset(object):
         
         print("Init KaggleDataset")
 
-        dataset_path = 'data/kaggle/ner_dataset.csv'
-        #dataset_path = '/content/ner_dataset.csv'
+        dataset_path = os.path.join(params.data_dir, 'ner_dataset.csv')
         error_msg = "{} file not found. ".format(dataset_path)
         assert os.path.isfile(dataset_path), error_msg
+        self.words = Counter()
         
         dataset_pd = pd.read_csv(dataset_path, encoding="latin1")
         dataset_pd = dataset_pd.fillna(method="ffill")
@@ -74,4 +75,59 @@ class KaggleDataset(object):
         params.num_of_tags = len(self.tags)
         params.max_sen_len = max([len(s) for s in self.dataset_labels])
 
+        if params.wb_method.lower() == 'glove':
+            self.create_vocab(params)
+            self.get_glove(params)
+
         print("Init KaggleDataset done.")
+
+
+    def update_vocab(self, dataset, vocab):        
+        for sen in dataset:
+            vocab.update(sen.split(' '))
+
+    def create_vocab(self, params):
+        self.update_vocab(self.train_sentences, self.words)
+        self.update_vocab(self.eval_sentences, self.words)
+        self.update_vocab(self.test_sentences, self.words)
+
+        self.words = [tok for tok, count in self.words.items() if count >= 1]
+
+        if params.pad_word not in self.words: self.words.append(params.pad_word)
+
+        self.words.append(params.unk_word)
+
+        params.vocab_size = len(self.words)
+
+        # Saving vocab:
+        with open(os.path.join(params.data_dir, 'words.txt'), "w") as f:
+            for word in self.words:
+                f.write(word + '\n')
+
+    def get_glove(self, params):
+        vocab = {j.strip(): i for i, j in enumerate(open(os.path.join(params.data_dir, 'words.txt')), 0)}
+        id2word = {vocab[i]: i for i in vocab}
+
+        dim = 0
+        w2v = {}
+        for line in open(os.path.join(params.glove_dir, 'glove.6B.{}d.txt'.format(params.glove_dim))):
+            line = line.strip().split()
+            word = line[0]
+            vec = list(map(float, line[1:]))
+            dim = len(vec)
+            w2v[word] = vec
+
+        vecs = []
+        vecs.append(np.random.uniform(low=-1.0, high=1.0, size=dim))
+
+        for i in range(1, len(vocab) - 1):
+            if id2word[i] in w2v:
+                vecs.append(w2v[id2word[i]])
+            else:
+                vecs.append(vecs[0])
+        vecs.append(np.zeros(dim))
+        assert(len(vecs) == len(vocab))
+
+        np.save(os.path.join(params.glove_dir, 'glove_{}d.npy'.format(dim)), np.array(vecs, dtype=np.float32))
+        np.save(os.path.join(params.glove_dir, 'word2id.npy'), vocab)
+        np.save(os.path.join(params.glove_dir, 'id2word.npy'), id2word)
