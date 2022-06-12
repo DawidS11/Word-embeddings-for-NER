@@ -1,2 +1,2 @@
 # Word-embeddings-for-NER
-Program sprawdzający wpływ wektorów zanurzenń w zadaniu wykrywania jednostek nazewniczych (NER). 
+Program sprawdzający wpływ wektorów zanurzeń w zadaniu wykrywania jednostek nazewniczych (NER). 

@@ -51,12 +51,12 @@ class KaggleDatasetLoader(object):
         #               maxlen=params.max_sen_len, value=params.pad_word, padding="post",
         #               dtype=object, truncating="post") 
 
-        labels_padded = pad_sequences([[l for l in lab] for lab in labels],
-                      maxlen=params.max_sen_len, value=self.tags[params.pad_tag], padding="post",       #self.tags[params.pad_tag] params.pad_tag_num
-                      dtype="long", truncating="post")
+        # labels_padded = pad_sequences([[l for l in lab] for lab in labels],
+        #               maxlen=params.max_sen_len, value=self.tags[params.pad_tag], padding="post",       #self.tags[params.pad_tag] params.pad_tag_num
+        #               dtype="long", truncating="post")
 
         data['sentences'] = sentences
-        data['labels'] = labels_padded
+        data['labels'] = labels
         return data
 
 

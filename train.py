@@ -14,7 +14,7 @@ import params
 
 def loss_fun(outputs, labels):
     
-    labels = labels.view(-1)        # (1D: batch_size*seq_len)
+    labels = labels.ravel()         # (1D: batch_size*seq_len)
 
     mask = (labels >= 0).float()
 
@@ -47,6 +47,7 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, params):
         sentences, labels = next(data_eval_iterator)
 
         outputs, labels = model(sentences, labels)
+        #outputs = model(sentences)
 
         labels = torch.LongTensor(labels)
         if params.cuda:
@@ -77,6 +78,7 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params)
         sentences, labels = next(data_train_iterator)
 
         outputs, labels = model(sentences, labels)
+        #outputs = model(sentences)
 
         labels = torch.LongTensor(labels)
         if params.cuda:
@@ -91,6 +93,7 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params)
 
         outputs = outputs.data.cpu().numpy()
         labels = labels.data.cpu().numpy()
+
         total_loss += loss.item()
         total_acc += accuracy(outputs, labels)
 
@@ -121,7 +124,7 @@ if __name__ == '__main__':
 
     model = Model(dataset_loader, params).cuda() if params.cuda else Model(dataset_loader, params)
     optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
-
+ 
     criterion = loss_fun
   
     best_acc = -1.0
@@ -132,7 +135,7 @@ if __name__ == '__main__':
     
     for epoch in range(params.num_epochs):
 
-        print("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+        print("Epoch {}/{}".format(epoch + 1, params.num_epochs), )
 
         start_time = time.time()
         # Training:
@@ -156,11 +159,11 @@ if __name__ == '__main__':
         evaluating_time = end_eval_time - end_train_time
         print("\nAverage eval loss: ", avg_loss)
         print("Average eval accuracy: ", avg_acc)
-        print("Evaluating time: ", time.time() - end_train_time)
+        print("Evaluating time: ", time.time() - end_train_time, "\n\n")
 
         if avg_acc > best_acc:
             best_acc = avg_acc
             best_epoch = epoch
             best_epoch_loss = avg_loss
 
-    print("Best accuracy: {:05.3f} for epoch number {} with the loss: {:05.3f}".format(best_acc, best_epoch, best_epoch_loss))
+    print("\nBest accuracy: {:05.3f} for epoch number {} with the loss: {:05.3f}".format(best_acc, best_epoch+1, best_epoch_loss))
