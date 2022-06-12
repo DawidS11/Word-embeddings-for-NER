@@ -126,7 +126,9 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
  
     criterion = loss_fun
-  
+    
+
+    print("Training...")
     best_acc = -1.0
     best_epoch = -1
     best_epoch_loss = -1.0
@@ -137,17 +139,17 @@ if __name__ == '__main__':
 
         print("Epoch {}/{}".format(epoch + 1, params.num_epochs), )
 
-        start_time = time.time()
+        start_train_time = time.time()
         # Training:
         num_batches = (params.train_size + 1) // params.batch_size           # number of batches in one epoch
         data_train_iterator = dataset_loader.data_iterator(data_train, num_batches, params, shuffle=True)
         avg_loss, avg_acc = train(model, optimizer, criterion, data_train_iterator, num_batches, params)
 
         end_train_time = time.time()
-        training_time = end_train_time - start_time
+        train_time = end_train_time - start_train_time
         print("Average train loss: ", avg_loss)
         print("Average train accuracy: ", avg_acc)
-        print("Training time: ", training_time)
+        print("Training time: ", train_time)
 
 
         # Evaluating:
@@ -156,10 +158,10 @@ if __name__ == '__main__':
         avg_loss, avg_acc = evaluate(model, criterion, data_eval_iterator, num_batches, params)
 
         end_eval_time = time.time()
-        evaluating_time = end_eval_time - end_train_time
+        eval_time = end_eval_time - end_train_time
         print("\nAverage eval loss: ", avg_loss)
         print("Average eval accuracy: ", avg_acc)
-        print("Evaluating time: ", time.time() - end_train_time, "\n\n")
+        print("Evaluating time: ", eval_time, "\n\n")
 
         if avg_acc > best_acc:
             best_acc = avg_acc
@@ -167,3 +169,17 @@ if __name__ == '__main__':
             best_epoch_loss = avg_loss
 
     print("\nBest accuracy: {:05.3f} for epoch number {} with the loss: {:05.3f}".format(best_acc, best_epoch+1, best_epoch_loss))
+
+    
+    print("\n\nTesting...")
+
+    data_test = dataset_loader.load_data("test", params)
+
+    start_test_time = time.time()
+    num_batches = (params.test_size + 1) // params.batch_size
+    data_eval_iterator = dataset_loader.data_iterator(data_eval, num_batches, params, shuffle=False)
+    avg_loss, avg_acc = evaluate(model, criterion, data_eval_iterator, num_batches, params)
+    end_test_time = time.time()
+    test_time = start_test_time - end_test_time
+
+    print("\Test accuracy: {:05.3f} with the loss: {:05.3f}".format(avg_acc, avg_loss))
