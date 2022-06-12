@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from transformers import BertTokenizer, BertModel
 from transformers import RobertaTokenizer, RobertaModel
-#from transformers import LukeTokenizer, LukeForEntitySpanClassification
+from transformers import LukeTokenizer, LukeModel
 #from allennlp.modules.elmo import Elmo, batch_to_ids
 
 from keras.preprocessing.sequence import pad_sequences
@@ -75,7 +75,14 @@ class Model(nn.Module):
             params.embedding_dim = params.roberta_dim
 
         elif self.wb_method == 'luke':
-            pass
+            self.embedding = LukeModel.from_pretrained("studio-ousia/luke-large")
+            self.tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-large")
+
+            for param in self.embedding.parameters():
+                param.requires_grad = False                 
+
+            params.embedding_dim = params.luke_dim
+
 
         else:
             print("init: wb_method nie zostala wybrana.")
@@ -168,8 +175,7 @@ class Model(nn.Module):
             if self.params.cuda:
                 inputs = inputs.cuda()
 
-            #x = self.embedding(inputs, attention_mask = mask)[0]
-            x = self.embedding(inputs)
+            x = self.embedding(inputs, attention_mask = mask)[0]
 
         elif self.wb_method == 'bert2':
 
@@ -260,7 +266,47 @@ class Model(nn.Module):
             x = self.embedding(inputs)[0]
 
         elif self.wb_method == 'luke':
-            pass
+            tokenized_sentences = []
+            tokenized_sen = []
+            tokenized_word = []
+            
+            tokenized_labels = []
+            tokenized_sen_labels = []
+            idx = -1
+
+            for sen, lab in zip(sentences, labels):
+                idx = -1
+                for word in sen:
+                    idx += 1
+                    tokenized_word = self.tokenizer.tokenize(word)
+
+                    for token in tokenized_word:
+                        tokenized_sen.append(token)
+                        tokenized_sen_labels.append(lab[idx])
+
+                tokenized_sentences.append(tokenized_sen)
+                tokenized_labels.append(tokenized_sen_labels)
+                tokenized_sen = []
+                tokenized_sen_labels = []
+
+            labels = tokenized_labels
+            labels = pad_sequences([[l for l in lab] for lab in labels],
+                maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
+                dtype="long", truncating="post")
+
+            mask = (labels >= 0)
+            mask = torch.FloatTensor(mask)
+            if self.params.cuda:
+                mask = mask.cuda()
+
+            inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
+                          maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
+
+            inputs = torch.LongTensor(inputs)
+            if self.params.cuda:
+                inputs = inputs.cuda()
+
+            x = self.embedding(inputs)[0]
 
         else:
             print("forward: wb_method nie zostala wybrana. ")

@@ -182,4 +182,4 @@ if __name__ == '__main__':
     end_test_time = time.time()
     test_time = start_test_time - end_test_time
 
-    print("\Test accuracy: {:05.3f} with the loss: {:05.3f}".format(avg_acc, avg_loss))
+    print("Test accuracy: {:05.3f} with the loss: {:05.3f}".format(avg_acc, avg_loss))
