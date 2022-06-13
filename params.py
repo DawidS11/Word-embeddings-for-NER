@@ -6,7 +6,7 @@ class Params():
         self.eval_dataset_size = 0.15
         self.test_dataset_size = 0.15        # 1 - train_dataset_size - val_dataset_size
 
-        self.wb_method = 'luke' # glove / elmo / bert / roberta / luke
+        self.wb_method = 'elmo' # glove / elmo / bert / roberta / luke
         self.nn_method = 'lstm' # rnn / lstm / cnn
 
         self.cuda = False    
@@ -24,13 +24,15 @@ class Params():
         self.roberta_dim = 1024       
         self.luke_dim = 1024                 
 
-        self.elmo_options_file = "./data/elmo/elmo_2x2048_256_2048cnn_1xhighway_options.json"
-        self.elmo_weight_file = "./data/elmo/elmo_2x2048_256_2048cnn_1xhighway_weights.hdf5"
-
         self.data_dir = 'data/kaggle/'  
         self.glove_dir = 'data/glove/'  
+        self.elmo_dir = 'data/elmo/'
         # self.data_dir = '/content/'  
         # self.glove_dir = '/content/' 
+        # self.elmo_dir = '/content/' 
+
+        self.elmo_options_file = "elmo_2x2048_256_2048cnn_1xhighway_options.json"
+        self.elmo_weight_file = "elmo_2x2048_256_2048cnn_1xhighway_weights.hdf5"
 
         self.train_size = 0
         self.eval_size = 0

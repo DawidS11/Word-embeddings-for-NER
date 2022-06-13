@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from transformers import BertTokenizer, BertModel
 from transformers import RobertaTokenizer, RobertaModel
 from transformers import LukeTokenizer, LukeModel
-#from allennlp.modules.elmo import Elmo, batch_to_ids
+from allennlp.modules.elmo import Elmo, batch_to_ids
 
 from keras.preprocessing.sequence import pad_sequences
 
@@ -34,11 +34,12 @@ class Model(nn.Module):
             params.embedding_dim = params.glove_dim
 
         elif self.wb_method == 'elmo':
-            pass
-            # self.embedding = Elmo(params.elmo_options_file, params.elmo_weight_file, 1)
+            #pass
+            self.embedding = Elmo(os.path.join(params.elmo_dir, params.elmo_options_file), 
+                            os.path.join(params.elmo_dir, params.elmo_weight_file), 1)
 
-            # for param in self.embedding.parameters():
-            #     param.requires_grad = False
+            for param in self.embedding.parameters():
+                param.requires_grad = False
 
             params.embedding_dim = params.elmo_dim
 
@@ -123,15 +124,31 @@ class Model(nn.Module):
             x = self.embedding(sentences)
         
         elif self.wb_method == 'elmo':
-            pass
+            # sentences = pad_sequences([[w for w in sen] for sen in sentences],
+            #               maxlen=self.params.max_sen_len, value=self.params.pad_word, dtype="long", truncating="post", padding="post")
+            sentences2 = []
+            tmp_sen = []
+            for sen in sentences:
+                for i in range(self.params.max_sen_len):
+                    if i < len(sen):
+                        tmp_sen.append(sen[i])
+                    else:
+                        tmp_sen.append(self.params.pad_word)
+                sentences2.append(tmp_sen)
+                tmp_sen = []
 
-            # character_ids = batch_to_ids(sentences)
-            # character_ids = torch.LongTensor(character_ids)
-            # if self.params.cuda:
-            #     character_ids = character_ids.cuda()
-            # #print(character_ids.shape)
-            # embeddings = self.embedding(character_ids)
-            # x = embeddings['elmo_representations'][0]
+            sentences = batch_to_ids(sentences2)
+
+            labels = pad_sequences([[l for l in lab] for lab in labels],
+                maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
+                dtype="long", truncating="post")
+
+            sentences = torch.LongTensor(sentences)
+            if self.params.cuda:
+                sentences = sentences.cuda()
+            embeddings = self.embedding(sentences)
+            x = embeddings['elmo_representations'][0]
+
 
         elif self.wb_method == 'bert':
 
