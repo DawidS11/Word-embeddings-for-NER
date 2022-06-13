@@ -34,7 +34,6 @@ class Model(nn.Module):
             params.embedding_dim = params.glove_dim
 
         elif self.wb_method == 'elmo':
-            #pass
             self.embedding = Elmo(os.path.join(params.elmo_dir, params.elmo_options_file), 
                             os.path.join(params.elmo_dir, params.elmo_weight_file), 1)
 
@@ -126,7 +125,7 @@ class Model(nn.Module):
         elif self.wb_method == 'elmo':
             # sentences = pad_sequences([[w for w in sen] for sen in sentences],
             #               maxlen=self.params.max_sen_len, value=self.params.pad_word, dtype="long", truncating="post", padding="post")
-            sentences2 = []
+            sentences_padded = []
             tmp_sen = []
             for sen in sentences:
                 for i in range(self.params.max_sen_len):
@@ -134,10 +133,10 @@ class Model(nn.Module):
                         tmp_sen.append(sen[i])
                     else:
                         tmp_sen.append(self.params.pad_word)
-                sentences2.append(tmp_sen)
+                sentences_padded.append(tmp_sen)
                 tmp_sen = []
 
-            sentences = batch_to_ids(sentences2)
+            sentences = batch_to_ids(sentences_padded)
 
             labels = pad_sequences([[l for l in lab] for lab in labels],
                 maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
