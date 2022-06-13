@@ -145,8 +145,7 @@ class Model(nn.Module):
             sentences = torch.LongTensor(sentences)
             if self.params.cuda:
                 sentences = sentences.cuda()
-            embeddings = self.embedding(sentences)
-            x = embeddings['elmo_representations'][0]
+            x = self.embedding(sentences)['elmo_representations'][0]
 
 
         elif self.wb_method == 'bert':
