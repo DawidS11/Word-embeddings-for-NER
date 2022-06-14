@@ -27,11 +27,11 @@ class KaggleDatasetLoader(object):
                 l = [self.tags[label] for label in sen]
                 labels.append(l) 
 
-        elif case == "eval":
-            for sen in self.kaggle_dataset.eval_sentences:
+        elif case == "val":
+            for sen in self.kaggle_dataset.val_sentences:
                 s = [w for w in sen.split(' ')]
                 sentences.append(s) 
-            for sen in self.kaggle_dataset.eval_labels:
+            for sen in self.kaggle_dataset.val_labels:
                 l = [self.tags[label] for label in sen]
                 labels.append(l)
 
@@ -82,8 +82,8 @@ class KaggleDatasetLoader(object):
 
 #         if case == "train":
 #             self.data = kaggle_dataset.load_data("train", params)
-#         elif case == "eval":
-#             self.data = kaggle_dataset.load_data("eval", params)
+#         elif case == "val":
+#             self.data = kaggle_dataset.load_data("val", params)
 #         elif case == "test":
 #             self.data = kaggle_dataset.load_data("test", params)
 #         else:

@@ -3,7 +3,7 @@ class Params():
     def __init__(self):
 
         self.train_dataset_size = 0.7
-        self.eval_dataset_size = 0.15
+        self.val_dataset_size = 0.15
         self.test_dataset_size = 0.15        # 1 - train_dataset_size - val_dataset_size
 
         self.wb_method = 'elmo' # glove / elmo / bert / roberta / luke
@@ -24,7 +24,8 @@ class Params():
         self.roberta_dim = 1024       
         self.luke_dim = 1024                 
 
-        self.data_dir = 'data/kaggle/'  
+        self.kaggle_dir = 'data/kaggle/'  
+        self.conll2003_dir = 'data/conll2003/'
         self.glove_dir = 'data/glove/'  
         self.elmo_dir = 'data/elmo/'
         # self.data_dir = '/content/'  

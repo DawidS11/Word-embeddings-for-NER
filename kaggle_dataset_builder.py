@@ -29,7 +29,7 @@ class KaggleDataset(object):
         
         print("Init KaggleDataset")
 
-        dataset_path = os.path.join(params.data_dir, 'ner_dataset.csv')
+        dataset_path = os.path.join(params.kaggle_dir, 'ner_dataset.csv')
         error_msg = "{} file not found. ".format(dataset_path)
         assert os.path.isfile(dataset_path), error_msg
         self.words = Counter()
@@ -45,26 +45,25 @@ class KaggleDataset(object):
         self.train_sentences = self.dataset_sentences[:int(params.train_dataset_size*len(self.dataset_sentences))]
         self.train_labels = self.dataset_labels[:int(params.train_dataset_size*len(self.dataset_labels))]
 
-        self.eval_sentences = self.dataset_sentences[int(params.train_dataset_size*len(self.dataset_sentences)) \
-            : int((params.train_dataset_size + params.eval_dataset_size)*len(self.dataset_sentences))]
-        self.eval_labels = self.dataset_labels[int(params.train_dataset_size*len(self.dataset_labels)) \
-            : int((params.train_dataset_size + params.eval_dataset_size)*len(self.dataset_labels))]
+        self.val_sentences = self.dataset_sentences[int(params.train_dataset_size*len(self.dataset_sentences)) \
+            : int((params.train_dataset_size + params.val_dataset_size)*len(self.dataset_sentences))]
+        self.val_labels = self.dataset_labels[int(params.train_dataset_size*len(self.dataset_labels)) \
+            : int((params.train_dataset_size + params.val_dataset_size)*len(self.dataset_labels))]
 
-        self.test_sentences = self.dataset_sentences[int((1.0 - params.eval_dataset_size)*len(self.dataset_sentences)):]
-        self.test_labels = self.dataset_labels[int((1.0 - params.eval_dataset_size)*len(self.dataset_labels)):]
+        self.test_sentences = self.dataset_sentences[int((1.0 - params.val_dataset_size)*len(self.dataset_sentences)):]
+        self.test_labels = self.dataset_labels[int((1.0 - params.val_dataset_size)*len(self.dataset_labels)):]
 
         # Assert sentences and labels lengths:
         assert len(self.train_sentences) == len(self.train_labels)
-        assert len(self.eval_sentences) == len(self.eval_labels)
+        assert len(self.val_sentences) == len(self.val_labels)
         assert len(self.test_sentences) == len(self.test_labels)
 
         params.train_size = len(self.train_sentences)
-        params.eval_size = len(self.eval_sentences)
+        params.val_size = len(self.val_sentences)
         params.test_size = len(self.test_sentences)
 
         # Creating a number representation of labels.
         tags_vals = list(set(dataset_pd["Tag"].values))
-        
         self.tags = {t: i for i, t in enumerate(tags_vals)}
         # if params.pad_word not in tags_vals: 
         #     self.tags[params.pad_word] = params.pad_tag_num
@@ -88,7 +87,7 @@ class KaggleDataset(object):
 
     def create_vocab(self, params):
         self.update_vocab(self.train_sentences, self.words)
-        self.update_vocab(self.eval_sentences, self.words)
+        self.update_vocab(self.val_sentences, self.words)
         self.update_vocab(self.test_sentences, self.words)
 
         self.words = [tok for tok, count in self.words.items() if count >= 1]

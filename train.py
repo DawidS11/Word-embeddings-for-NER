@@ -118,9 +118,9 @@ if __name__ == '__main__':
     # Getting data:
     dataset_loader = KaggleDatasetLoader(params)
     data_train = dataset_loader.load_data("train", params)
-    data_eval = dataset_loader.load_data("eval", params)
+    data_val = dataset_loader.load_data("val", params)
     # data_train = MyDataset("train", data_loader, params)
-    # data_eval = MyDataset("val", data_loader, params)
+    # data_val = MyDataset("val", data_loader, params)
 
     model = Model(dataset_loader, params).cuda() if params.cuda else Model(dataset_loader, params)
     optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
@@ -152,16 +152,16 @@ if __name__ == '__main__':
         print("Training time: ", train_time)
 
 
-        # Evaluating:
-        num_batches = (params.eval_size + 1) // params.batch_size
-        data_eval_iterator = dataset_loader.data_iterator(data_eval, num_batches, params, shuffle=False)
-        avg_loss, avg_acc = evaluate(model, criterion, data_eval_iterator, num_batches, params)
+        # Validation:
+        num_batches = (params.val_size + 1) // params.batch_size
+        data_val_iterator = dataset_loader.data_iterator(data_val, num_batches, params, shuffle=False)
+        avg_loss, avg_acc = evaluate(model, criterion, data_val_iterator, num_batches, params)
 
-        end_eval_time = time.time()
-        eval_time = end_eval_time - end_train_time
-        print("\nAverage eval loss: ", avg_loss)
-        print("Average eval accuracy: ", avg_acc)
-        print("Evaluating time: ", eval_time, "\n\n")
+        end_val_time = time.time()
+        val_time = end_val_time - end_train_time
+        print("\nAverage val loss: ", avg_loss)
+        print("Average val accuracy: ", avg_acc)
+        print("Validation time: ", val_time, "\n\n")
 
         if avg_acc > best_acc:
             best_acc = avg_acc
@@ -177,8 +177,8 @@ if __name__ == '__main__':
 
     start_test_time = time.time()
     num_batches = (params.test_size + 1) // params.batch_size
-    data_eval_iterator = dataset_loader.data_iterator(data_eval, num_batches, params, shuffle=False)
-    avg_loss, avg_acc = evaluate(model, criterion, data_eval_iterator, num_batches, params)
+    data_test_iterator = dataset_loader.data_iterator(data_test, num_batches, params, shuffle=False)
+    avg_loss, avg_acc = evaluate(model, criterion, data_test_iterator, num_batches, params)
     end_test_time = time.time()
     test_time = start_test_time - end_test_time
 
