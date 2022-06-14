@@ -6,8 +6,8 @@ from tqdm import trange
 import time
 
 from model import Model
-from kaggle_dataset_loader import KaggleDatasetLoader #, MyDataset
-from torch.utils.data import DataLoader
+from dataset_loader import DatasetLoader #, MyDataset
+#from torch.utils.data import DataLoader
 
 import params
 
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         torch.cuda.manual_seed(params.seed)
 
     # Getting data:
-    dataset_loader = KaggleDatasetLoader(params)
+    dataset_loader = DatasetLoader(params)
     data_train = dataset_loader.load_data("train", params)
     data_val = dataset_loader.load_data("val", params)
     # data_train = MyDataset("train", data_loader, params)

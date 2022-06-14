@@ -34,9 +34,9 @@ class Conll2003Dataset(object):
         
         print("Init Conll2003Dataset")
 
-        train_dataset_path = os.path.join(params.conll2003_dir, 'train.txt')
-        val_dataset_path = os.path.join(params.conll2003_dir, 'valid.txt')
-        test_dataset_path = os.path.join(params.conll2003_dir, 'test.txt')
+        train_dataset_path = os.path.join(params.data_dir, 'train.txt')
+        val_dataset_path = os.path.join(params.data_dir, 'valid.txt')
+        test_dataset_path = os.path.join(params.data_dir, 'test.txt')
         error_msg = "{} file not found. ".format(train_dataset_path)
         assert os.path.isfile(train_dataset_path), error_msg
         error_msg = "{} file not found. ".format(val_dataset_path)
@@ -124,3 +124,8 @@ class Conll2003Dataset(object):
         np.save(os.path.join(params.glove_dir, 'glove_{}d.npy'.format(dim)), np.array(vecs, dtype=np.float32))
         np.save(os.path.join(params.glove_dir, 'word2id.npy'), vocab)
         np.save(os.path.join(params.glove_dir, 'id2word.npy'), id2word)
+
+if __name__ == '__main__':
+    params = Params()
+    d = Conll2003Dataset(params)
+    print(d.train_sentences)

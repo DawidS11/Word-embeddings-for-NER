@@ -3,6 +3,8 @@ import pandas as pd
 import os
 from collections import Counter
 
+from params import Params
+
 class GetSentences(object):
     
     def __init__(self, data):
@@ -29,7 +31,7 @@ class KaggleDataset(object):
         
         print("Init KaggleDataset")
 
-        dataset_path = os.path.join(params.kaggle_dir, 'ner_dataset.csv')
+        dataset_path = os.path.join(params.data_dir, 'ner_dataset.csv')
         error_msg = "{} file not found. ".format(dataset_path)
         assert os.path.isfile(dataset_path), error_msg
         self.words = Counter()
@@ -38,8 +40,9 @@ class KaggleDataset(object):
         dataset_pd = dataset_pd.fillna(method="ffill")
 
         sentences = GetSentences(dataset_pd)
-        self.dataset_sentences = [" ".join([s[0] for s in sent]) for sent in sentences.sentences]
-        self.dataset_labels  = [[s[2] for s in sent] for sent in sentences.sentences]
+        #self.dataset_sentences = [" ".join([s[0] for s in sent]) for sent in sentences.sentences]
+        self.dataset_sentences = [[s[0] for s in sen] for sen in sentences.sentences]
+        self.dataset_labels  = [[s[2] for s in sen] for sen in sentences.sentences]
         
         # Creating sets of sentences and labels for train, val and test:
         self.train_sentences = self.dataset_sentences[:int(params.train_dataset_size*len(self.dataset_sentences))]
@@ -65,11 +68,6 @@ class KaggleDataset(object):
         # Creating a number representation of labels.
         tags_vals = list(set(dataset_pd["Tag"].values))
         self.tags = {t: i for i, t in enumerate(tags_vals)}
-        # if params.pad_word not in tags_vals: 
-        #     self.tags[params.pad_word] = params.pad_tag_num
-
-        # if params.pad_tag not in tags_vals: tags_vals.append(params.pad_tag)
-        # self.tags = {t: i for i, t in enumerate(tags_vals)}
 
         params.num_of_tags = len(self.tags)
         params.max_sen_len = max([len(s) for s in self.dataset_labels])
@@ -82,8 +80,11 @@ class KaggleDataset(object):
 
 
     def update_vocab(self, dataset, vocab):        
+        # for sen in dataset:
+        #     vocab.update(sen.split(' '))
         for sen in dataset:
-            vocab.update(sen.split(' '))
+            for w in sen:
+                vocab.update(w)
 
     def create_vocab(self, params):
         self.update_vocab(self.train_sentences, self.words)

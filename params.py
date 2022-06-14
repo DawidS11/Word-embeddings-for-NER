@@ -4,10 +4,11 @@ class Params():
 
         self.train_dataset_size = 0.7
         self.val_dataset_size = 0.15
-        self.test_dataset_size = 0.15        # 1 - train_dataset_size - val_dataset_size
+        self.test_dataset_size = 0.15       
 
-        self.wb_method = 'elmo' # glove / elmo / bert / roberta / luke
+        self.wb_method = 'glove' # glove / elmo / bert / roberta / luke
         self.nn_method = 'lstm' # rnn / lstm / cnn
+        self.dataset_name = 'kaggle' # kaggle / conll2003
 
         self.cuda = False    
         self.seed = 2022  
@@ -24,8 +25,7 @@ class Params():
         self.roberta_dim = 1024       
         self.luke_dim = 1024                 
 
-        self.kaggle_dir = 'data/kaggle/'  
-        self.conll2003_dir = 'data/conll2003/'
+        self.data_dir = 'data/kaggle/'  # 'data/conll2003/'
         self.glove_dir = 'data/glove/'  
         self.elmo_dir = 'data/elmo/'
         # self.data_dir = '/content/'  
