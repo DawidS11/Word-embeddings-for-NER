@@ -149,7 +149,6 @@ class Model(nn.Module):
 
 
         elif self.wb_method == 'bert':
-
             tokenized_sentences = []
             tokenized_sen = []
             tokenized_word = []
