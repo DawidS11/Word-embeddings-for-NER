@@ -49,21 +49,8 @@ class Model(nn.Module):
             for param in self.embedding.parameters():
                 param.requires_grad = False                 
 
+            params.max_sen_len += 2     # "[CLS]", "[SEP]"
             params.embedding_dim = params.bert_dim
-
-        elif self.wb_method == 'bert2':
-            self.tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
-            bert = BertModel.from_pretrained("bert-base-cased")
-            bert_embeddings = list(bert.children())[0]
-            bert_word_embeddings = list(bert_embeddings.children())[0]
-            emb = bert_word_embeddings.weight.data.numpy()
-
-            emb = torch.FloatTensor(emb)
-            if params.cuda:
-                emb = emb.cuda()
-            emb = nn.Parameter(emb)
-            self.embedding = nn.Embedding(len(emb), len(emb[0]))
-            self.embedding.weight = emb
 
         elif self.wb_method == 'roberta':
             self.embedding = RobertaModel.from_pretrained("roberta-large")
@@ -81,6 +68,7 @@ class Model(nn.Module):
             for param in self.embedding.parameters():
                 param.requires_grad = False                 
 
+            params.max_sen_len += 2     # "<s>", "</s>"
             params.embedding_dim = params.luke_dim
 
 
@@ -149,6 +137,29 @@ class Model(nn.Module):
 
 
         elif self.wb_method == 'bert':
+            # tokenized_sentences = []
+            # tokenized_sen = []
+            # tokenized_word = []
+            
+            # tokenized_labels = []
+            # tokenized_sen_labels = []
+            # idx = -1
+
+            # for sen, lab in zip(sentences, labels):
+            #     idx = -1
+            #     for word in sen:
+            #         idx += 1
+            #         tokenized_word = self.tokenizer.tokenize(word)
+
+            #         for token in tokenized_word:
+            #             tokenized_sen.append(token)
+            #             tokenized_sen_labels.append(lab[idx])
+
+            #     tokenized_sentences.append(tokenized_sen)
+            #     tokenized_labels.append(tokenized_sen_labels)
+            #     tokenized_sen = []
+            #     tokenized_sen_labels = []
+
             tokenized_sentences = []
             tokenized_sen = []
             tokenized_word = []
@@ -156,16 +167,27 @@ class Model(nn.Module):
             tokenized_labels = []
             tokenized_sen_labels = []
             idx = -1
+            is_first = True
 
             for sen, lab in zip(sentences, labels):
+                if sen[0] != "[CLS]":
+                    sen.insert(0, "[CLS]")
+                    sen.append("[SEP]")
+                    lab.insert(0, -1)
+                    lab.append(-1)
                 idx = -1
                 for word in sen:
                     idx += 1
                     tokenized_word = self.tokenizer.tokenize(word)
 
+                    is_first = True
                     for token in tokenized_word:
                         tokenized_sen.append(token)
-                        tokenized_sen_labels.append(lab[idx])
+                        if is_first:
+                            tokenized_sen_labels.append(lab[idx])
+                            is_first = False
+                        else:
+                            tokenized_sen_labels.append(-1)
 
                 tokenized_sentences.append(tokenized_sen)
                 tokenized_labels.append(tokenized_sen_labels)
@@ -184,56 +206,12 @@ class Model(nn.Module):
 
             inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
                           maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
-            
+
             inputs = torch.LongTensor(inputs)
             if self.params.cuda:
                 inputs = inputs.cuda()
 
             x = self.embedding(inputs, attention_mask = mask)[0]
-
-        elif self.wb_method == 'bert2':
-
-            tokenized_sentences = []
-            tokenized_sen = []
-            tokenized_word = []
-            
-            tokenized_labels = []
-            tokenized_sen_labels = []
-            idx = -1
-
-            for sen, lab in zip(sentences, labels):
-                idx = -1
-                for word in sen:
-                    idx += 1
-                    tokenized_word = self.tokenizer.tokenize(word)
-
-                    for token in tokenized_word:
-                        tokenized_sen.append(token)
-                        tokenized_sen_labels.append(lab[idx])
-
-                tokenized_sentences.append(tokenized_sen)
-                tokenized_labels.append(tokenized_sen_labels)
-                tokenized_sen = []
-                tokenized_sen_labels = []
-
-            labels = tokenized_labels
-            labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
-                dtype="long", truncating="post")
-
-            mask = (labels >= 0)
-            mask = torch.FloatTensor(mask)
-            if self.params.cuda:
-                mask = mask.cuda()
-
-            inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
-                          maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
-            
-            inputs = torch.LongTensor(inputs)
-            if self.params.cuda:
-                inputs = inputs.cuda()
-
-            x = self.embedding(inputs)
 
         elif self.wb_method == 'roberta':
 
@@ -244,16 +222,27 @@ class Model(nn.Module):
             tokenized_labels = []
             tokenized_sen_labels = []
             idx = -1
+            is_first = True
 
             for sen, lab in zip(sentences, labels):
+                if sen[0] != "<s>":            
+                    sen.insert(0, "<s>")
+                    sen.append("</s>")
+                    lab.insert(0, -1)
+                    lab.append(-1)
                 idx = -1
                 for word in sen:
                     idx += 1
                     tokenized_word = self.tokenizer.tokenize(word)
 
+                    is_first = True
                     for token in tokenized_word:
                         tokenized_sen.append(token)
-                        tokenized_sen_labels.append(lab[idx])
+                        if is_first:
+                            tokenized_sen_labels.append(lab[idx])
+                            is_first = False
+                        else:
+                            tokenized_sen_labels.append(-1)
 
                 tokenized_sentences.append(tokenized_sen)
                 tokenized_labels.append(tokenized_sen_labels)
