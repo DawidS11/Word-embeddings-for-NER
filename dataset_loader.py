@@ -48,7 +48,7 @@ class DatasetLoader(object):
         return data
 
 
-    def data_iterator(self, data, num_batches, params, shuffle=False):
+    def data_iterator(self, data, dataset_size, batch_size, params, shuffle=False):
 
         data_len = len(data['sentences'])
         order = list(range(data_len))      
@@ -57,9 +57,10 @@ class DatasetLoader(object):
             random.seed(params.seed)
             random.shuffle(order)
 
+        num_batches = (dataset_size + 1) // batch_size
         for i in range(num_batches):
-            batch_sentences = [data['sentences'][idx] for idx in order[i*params.batch_size : (i+1)*params.batch_size]]
-            batch_tags = [data['labels'][idx] for idx in order[i*params.batch_size:(i+1)*params.batch_size]]
+            batch_sentences = [data['sentences'][idx] for idx in order[i*batch_size : (i+1)*batch_size]]
+            batch_tags = [data['labels'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
     
             yield batch_sentences, batch_tags
 

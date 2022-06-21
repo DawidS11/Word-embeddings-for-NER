@@ -122,7 +122,7 @@ if __name__ == '__main__':
     # data_train = MyDataset("train", data_loader, params)
     # data_val = MyDataset("val", data_loader, params)
 
-    model = Model(dataset_loader, params).cuda() if params.cuda else Model(dataset_loader, params)
+    model = Model(params).cuda() if params.cuda else Model(params)
     optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
  
     criterion = loss_fun
@@ -141,8 +141,8 @@ if __name__ == '__main__':
 
         start_train_time = time.time()
         # Training:
-        num_batches = (params.train_size + 1) // params.batch_size           # number of batches in one epoch
-        data_train_iterator = dataset_loader.data_iterator(data_train, num_batches, params, shuffle=True)
+        num_batches = (params.train_size + 1) // params.train_batch_size           # number of batches in one epoch
+        data_train_iterator = dataset_loader.data_iterator(data_train, params.train_size, params.train_batch_size, params, shuffle=True)
         avg_loss, avg_acc = train(model, optimizer, criterion, data_train_iterator, num_batches, params)
 
         end_train_time = time.time()
@@ -153,8 +153,8 @@ if __name__ == '__main__':
 
 
         # Validation:
-        num_batches = (params.val_size + 1) // params.batch_size
-        data_val_iterator = dataset_loader.data_iterator(data_val, num_batches, params, shuffle=False)
+        num_batches = (params.val_size + 1) // params.val_batch_size
+        data_val_iterator = dataset_loader.data_iterator(data_val, params.val_size, params.val_batch_size, params, shuffle=False)
         avg_loss, avg_acc = evaluate(model, criterion, data_val_iterator, num_batches, params)
 
         end_val_time = time.time()
@@ -176,8 +176,8 @@ if __name__ == '__main__':
     data_test = dataset_loader.load_data("test", params)
 
     start_test_time = time.time()
-    num_batches = (params.test_size + 1) // params.batch_size
-    data_test_iterator = dataset_loader.data_iterator(data_test, num_batches, params, shuffle=False)
+    num_batches = (params.test_size + 1) // params.val_batch_size
+    data_test_iterator = dataset_loader.data_iterator(data_test, params.test_size, params.val_batch_size, params, shuffle=False)
     avg_loss, avg_acc = evaluate(model, criterion, data_test_iterator, num_batches, params)
     end_test_time = time.time()
     test_time = start_test_time - end_test_time

@@ -14,11 +14,11 @@ from keras.preprocessing.sequence import pad_sequences
 
 class Model(nn.Module):
 
-    def __init__(self, dataset_loader, params):
+    def __init__(self, params):
         super(Model, self).__init__()
 
         self.params = params
-        self.dataset_loader = dataset_loader
+        self.dropout = nn.Dropout(params.dropout)
 
         self.wb_method = params.wb_method.lower()
 
@@ -43,8 +43,8 @@ class Model(nn.Module):
             params.embedding_dim = params.elmo_dim
 
         elif self.wb_method == 'bert':
-            self.embedding = BertModel.from_pretrained("bert-large-cased")
-            self.tokenizer = BertTokenizer.from_pretrained("bert-large-cased")
+            self.embedding = BertModel.from_pretrained("bert-base-cased")
+            self.tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
 
             for param in self.embedding.parameters():
                 param.requires_grad = False                 
@@ -62,13 +62,13 @@ class Model(nn.Module):
             params.embedding_dim = params.roberta_dim
 
         elif self.wb_method == 'luke':
-            self.embedding = LukeModel.from_pretrained("studio-ousia/luke-large")
-            self.tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-large")
+            self.embedding = LukeModel.from_pretrained("studio-ousia/luke-base")
+            self.tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
 
             for param in self.embedding.parameters():
                 param.requires_grad = False                 
 
-            params.max_sen_len += 2     # "<s>", "</s>"
+            #params.max_sen_len += 2     # "<s>", "</s>"
             params.embedding_dim = params.luke_dim
 
 
@@ -137,28 +137,6 @@ class Model(nn.Module):
 
 
         elif self.wb_method == 'bert':
-            # tokenized_sentences = []
-            # tokenized_sen = []
-            # tokenized_word = []
-            
-            # tokenized_labels = []
-            # tokenized_sen_labels = []
-            # idx = -1
-
-            # for sen, lab in zip(sentences, labels):
-            #     idx = -1
-            #     for word in sen:
-            #         idx += 1
-            #         tokenized_word = self.tokenizer.tokenize(word)
-
-            #         for token in tokenized_word:
-            #             tokenized_sen.append(token)
-            #             tokenized_sen_labels.append(lab[idx])
-
-            #     tokenized_sentences.append(tokenized_sen)
-            #     tokenized_labels.append(tokenized_sen_labels)
-            #     tokenized_sen = []
-            #     tokenized_sen_labels = []
 
             tokenized_sentences = []
             tokenized_sen = []
@@ -173,8 +151,8 @@ class Model(nn.Module):
                 if sen[0] != "[CLS]":
                     sen.insert(0, "[CLS]")
                     sen.append("[SEP]")
-                    lab.insert(0, -1)
-                    lab.append(-1)
+                    lab.insert(0, self.params.pad_tag_num)
+                    lab.append(self.params.pad_tag_num)
                 idx = -1
                 for word in sen:
                     idx += 1
@@ -196,7 +174,7 @@ class Model(nn.Module):
 
             labels = tokenized_labels
             labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
+                maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",  
                 dtype="long", truncating="post")
 
             mask = (labels >= 0)
@@ -205,13 +183,14 @@ class Model(nn.Module):
                 mask = mask.cuda()
 
             inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
-                          maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
+                            maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
 
             inputs = torch.LongTensor(inputs)
             if self.params.cuda:
                 inputs = inputs.cuda()
-
+            
             x = self.embedding(inputs, attention_mask = mask)[0]
+            
 
         elif self.wb_method == 'roberta':
 
@@ -319,15 +298,15 @@ class Model(nn.Module):
             x, _ = self.lstm(x)
             x = x.contiguous()
             x = x.view(-1, x.shape[2])
-            x = self.fc(x)
 
         elif self.nn_method == 'rnn':
             x, _ = self.rnn(x)
             x = x.contiguous()
             x = x.view(-1, x.shape[2])
-            x = self.fc(x)
 
         else:
             print("forward: nn_method nie zostala wybrana")
 
+        x = self.dropout(x)
+        x = self.fc(x)
         return F.log_softmax(x, dim=1), labels
