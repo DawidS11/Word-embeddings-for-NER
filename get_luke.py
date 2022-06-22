@@ -10,13 +10,49 @@ import spacy
 import torch
 import torch.nn as nn
 from tqdm import tqdm, trange
-from transformers import LukeTokenizer, LukeForEntitySpanClassification, LukeModel
+from transformers import BertTokenizer, LukeTokenizer, LukeForEntitySpanClassification, LukeModel
 
 from keras.preprocessing.sequence import pad_sequences
 import torch.optim as optim
-from train import loss_fun as loss_fun
-from train import accuracy as accuracy
+# from train import loss_fun as loss_fun
+# from train import accuracy as accuracy
 import torch.nn.functional as F
+
+
+def calc_entity_spans(sentences, labels):
+    entity_spans = []
+    sentence_entity_spans = []
+
+    # beg = 0
+    # end = 0
+    # for sen, lab in zip(sentences, labels):
+    #     for s, l in zip(sen, lab):
+    #         if l[0] == "B":
+    #             end += len(s)
+    #         elif l[0] == "I":
+    #             end += len(s)
+    #         else:
+    #             end += len(s)
+    #             beg = end+1
+    for sentence_words in sentences:   
+        sentence_entity_spans = []
+        word_start_char_positions = []
+        word_end_char_positions = []
+        text = ""
+        for word in sentence_words:
+            # if word[0] == "'" or (len(word) == 1 and is_punctuation(word)):
+            #     text = text.rstrip()
+            word_start_char_positions.append(len(text))
+            text += word
+            word_end_char_positions.append(len(text))
+            text += " "         
+        for word_start in range(len(sentence_words)):
+            for word_end in range(word_start, len(sentence_words)):
+                sentence_entity_spans.append(
+                    (word_start_char_positions[word_start], word_end_char_positions[word_end])
+                )
+        entity_spans.append(sentence_entity_spans)
+    return entity_spans
 
 
 def load_documents(dataset_file):
@@ -187,11 +223,10 @@ class ModelLuke(nn.Module):
         self.fc = nn.Linear(100, 9)
 
     def forward(self, batch_examples):
-        # texts = [example["text"] for example in batch_examples]
-        texts = [" ".join(example["words"]) for example in batch_examples]
+        texts = [example["text"] for example in batch_examples]
+        #texts = [" ".join(example["words"]) for example in batch_examples]
 
         entity_spans = [example["entity_spans"] for example in batch_examples]
-
         inputs = self.tokenizer(texts, entity_spans=entity_spans, return_tensors="pt", padding=True)
 
         attention_mask2 = inputs["attention_mask"]
@@ -232,6 +267,12 @@ class ModelLuke(nn.Module):
 
 
 if __name__ == '__main__':
+    # tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
+    # tokenizer2 = BertTokenizer.from_pretrained("bert-base-cased")
+    # sen = "I am Dawid. Hello world."
+    # print(tokenizer.tokenize(sen))
+    # print(tokenizer2.tokenize(sen))
+    # quit()
     cuda = torch.cuda.is_available()
     torch.manual_seed(2022)
     if cuda:
@@ -256,12 +297,12 @@ if __name__ == '__main__':
 
     batch_size = 2
     all_logits = []
-    # train_documents = load_documents("data/conll2003/train.txt")
-    # val_documents = load_documents("data/conll2003/valid.txt")
-    # test_documents = load_documents("data/conll2003/test.txt")
-    train_documents = load_documents("/content/train.txt")
-    val_documents = load_documents("/content/valid.txt")
-    test_documents = load_documents("/content/test.txt")
+    train_documents = load_documents("data/conll2003/train.txt")
+    val_documents = load_documents("data/conll2003/valid.txt")
+    test_documents = load_documents("data/conll2003/test.txt")
+    # train_documents = load_documents("/content/train.txt")
+    # val_documents = load_documents("/content/valid.txt")
+    # test_documents = load_documents("/content/test.txt")
 
     list_labels = []
     for i in range(len(train_documents)):

@@ -10,7 +10,7 @@ from transformers import LukeTokenizer, LukeModel
 from allennlp.modules.elmo import Elmo, batch_to_ids
 
 from keras.preprocessing.sequence import pad_sequences
-
+from get_luke import calc_entity_spans
 
 class Model(nn.Module):
 
@@ -53,8 +53,8 @@ class Model(nn.Module):
             params.embedding_dim = params.bert_dim
 
         elif self.wb_method == 'roberta':
-            self.embedding = RobertaModel.from_pretrained("roberta-large")
-            self.tokenizer = RobertaTokenizer.from_pretrained("roberta-large")
+            self.embedding = RobertaModel.from_pretrained("roberta-base")
+            self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
             for param in self.embedding.parameters():
                 param.requires_grad = False  
@@ -248,6 +248,7 @@ class Model(nn.Module):
             x = self.embedding(inputs)[0]
 
         elif self.wb_method == 'luke':
+            
             tokenized_sentences = []
             tokenized_sen = []
             tokenized_word = []
@@ -255,22 +256,34 @@ class Model(nn.Module):
             tokenized_labels = []
             tokenized_sen_labels = []
             idx = -1
+            is_first = True
 
             for sen, lab in zip(sentences, labels):
+                # if sen[0] != "<s>":            
+                #     sen.insert(0, "<s>")
+                #     sen.append("</s>")
+                #     lab.insert(0, -1)
+                #     lab.append(-1)
                 idx = -1
                 for word in sen:
                     idx += 1
                     tokenized_word = self.tokenizer.tokenize(word)
 
+                    is_first = True
                     for token in tokenized_word:
                         tokenized_sen.append(token)
-                        tokenized_sen_labels.append(lab[idx])
+                        if is_first:
+                            tokenized_sen_labels.append(lab[idx])
+                            is_first = False
+                        else:
+                            tokenized_sen_labels.append(-1)
 
                 tokenized_sentences.append(tokenized_sen)
                 tokenized_labels.append(tokenized_sen_labels)
                 tokenized_sen = []
                 tokenized_sen_labels = []
 
+            entity_spans = calc_entity_spans(sentences, labels)
             labels = tokenized_labels
             labels = pad_sequences([[l for l in lab] for lab in labels],
                 maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
@@ -281,14 +294,45 @@ class Model(nn.Module):
             if self.params.cuda:
                 mask = mask.cuda()
 
-            inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
-                          maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
+            texts = [" ".join(sen) for sen in sentences]
+            inputs = self.tokenizer(texts, entity_spans=entity_spans, return_tensors="pt", padding=True)
 
-            inputs = torch.LongTensor(inputs)
+            attention_mask2 = inputs["attention_mask"]
+            entity_attention_mask = inputs["entity_attention_mask"]
+            inputs2 = inputs["input_ids"]
+            entity_ids = inputs["entity_ids"]
+            entity_position_ids = inputs["entity_position_ids"]
+
+            inputs = pad_sequences([sen for sen in inputs2],
+                                maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
+            attention_mask = pad_sequences([mask for mask in attention_mask2],
+                                maxlen=self.params.max_sen_len, dtype="long", value=0, truncating="post", padding="post")
+
             if self.params.cuda:
+                attention_mask = torch.LongTensor(attention_mask)
+                entity_attention_mask = torch.LongTensor(entity_attention_mask)
+                inputs = torch.LongTensor(inputs)
+                entity_ids = torch.LongTensor(entity_ids)
+                entity_position_ids = torch.LongTensor(entity_position_ids)
+                attention_mask = attention_mask.cuda()
+                entity_attention_mask = entity_attention_mask.cuda()
                 inputs = inputs.cuda()
+                entity_ids = entity_ids.cuda()
+                entity_position_ids = entity_position_ids.cuda()
 
-            x = self.embedding(inputs)[0]
+            outputs = self.embedding(inputs, attention_mask = attention_mask, entity_attention_mask=entity_attention_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids)
+            x = outputs[0]
+
+
+
+            # inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
+            #               maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
+
+            # inputs = torch.LongTensor(inputs)
+            # if self.params.cuda:
+            #     inputs = inputs.cuda()
+
+            # x = self.embedding(inputs)[0]
 
         else:
             print("forward: wb_method nie zostala wybrana. ")
