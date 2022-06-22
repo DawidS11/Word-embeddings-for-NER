@@ -187,7 +187,9 @@ class ModelLuke(nn.Module):
         self.fc = nn.Linear(100, 9)
 
     def forward(self, batch_examples):
-        texts = [example["text"] for example in batch_examples]
+        # texts = [example["text"] for example in batch_examples]
+        texts = [" ".join(example["words"]) for example in batch_examples]
+
         entity_spans = [example["entity_spans"] for example in batch_examples]
 
         inputs = self.tokenizer(texts, entity_spans=entity_spans, return_tensors="pt", padding=True)
@@ -254,7 +256,12 @@ if __name__ == '__main__':
 
     batch_size = 2
     all_logits = []
-    train_documents = load_documents("data/conll2003/train.txt")
+    # train_documents = load_documents("data/conll2003/train.txt")
+    # val_documents = load_documents("data/conll2003/valid.txt")
+    # test_documents = load_documents("data/conll2003/test.txt")
+    train_documents = load_documents("/content/train.txt")
+    val_documents = load_documents("/content/valid.txt")
+    test_documents = load_documents("/content/test.txt")
 
     list_labels = []
     for i in range(len(train_documents)):
@@ -264,19 +271,24 @@ if __name__ == '__main__':
     val2id = {t: i for i, t in enumerate(tags_vals)}
     id2val = {i: t for i, t in enumerate(tags_vals)}
 
-    train_examples, final_labels = load_examples(train_documents, val2id)
+    train_examples, train_labels = load_examples(train_documents, val2id)
+    val_examples, val_labels = load_examples(val_documents, val2id)
+    test_examples, test_labels = load_examples(test_documents, val2id)
+
     model = ModelLuke().cuda() if cuda else ModelLuke()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     criterion = loss_fun
+
 
     model.train()
     total_loss = 0.0
     total_acc = 0.0
     num_batches = 0
+
     for batch_start_idx in trange(0, len(train_examples), batch_size):
         num_batches += 1
         batch_examples = train_examples[batch_start_idx:batch_start_idx + batch_size]
-        batch_labels = final_labels[batch_start_idx:batch_start_idx + batch_size]
+        batch_labels = train_labels[batch_start_idx:batch_start_idx + batch_size]
         outputs = model(batch_examples)         # dlugosc 1020
 
         batch_labels = torch.LongTensor(batch_labels)
@@ -295,9 +307,67 @@ if __name__ == '__main__':
         total_loss += loss.item()
         total_acc += accuracy(outputs, batch_labels)
 
-        avg_loss = total_loss / num_batches
-        avg_acc = total_acc / num_batches
+    avg_loss = total_loss / num_batches
+    avg_acc = total_acc / num_batches
+    print("Loss: ", avg_loss, "   Accuracy: ", avg_acc)
 
+
+    model.eval()
+    total_loss = 0.0
+    total_acc = 0.0
+    num_batches = 0
+    for batch_start_idx in trange(0, len(val_examples), batch_size):
+        num_batches += 1
+
+        batch_examples = val_examples[batch_start_idx:batch_start_idx + batch_size]
+        batch_labels = val_labels[batch_start_idx:batch_start_idx + batch_size]
+        outputs = model(batch_examples) 
+
+        batch_labels = torch.LongTensor(batch_labels)
+        if cuda:
+            batch_labels = batch_labels.cuda()
+
+        loss = criterion(outputs, batch_labels)
+
+        outputs = outputs.data.cpu().numpy()
+        batch_labels = batch_labels.data.cpu().numpy()
+
+        total_loss += loss.item()
+        total_acc += accuracy(outputs, batch_labels)
+
+    avg_loss = total_loss / num_batches
+    avg_acc = total_acc / num_batches
+    print("Loss: ", avg_loss, "   Accuracy: ", avg_acc)
+
+
+    model.eval()
+    total_loss = 0.0
+    total_acc = 0.0
+    num_batches = 0
+    for batch_start_idx in trange(0, len(test_examples), batch_size):
+        num_batches += 1
+
+        batch_examples = test_examples[batch_start_idx:batch_start_idx + batch_size]
+        batch_labels = test_labels[batch_start_idx:batch_start_idx + batch_size]
+        outputs = model(batch_examples) 
+
+        batch_labels = torch.LongTensor(batch_labels)
+        if cuda:
+            batch_labels = batch_labels.cuda()
+
+        loss = criterion(outputs, batch_labels)
+
+        outputs = outputs.data.cpu().numpy()
+        batch_labels = batch_labels.data.cpu().numpy()
+
+        total_loss += loss.item()
+        total_acc += accuracy(outputs, batch_labels)
+
+    avg_loss = total_loss / num_batches
+    avg_acc = total_acc / num_batches
+    print("Loss: ", avg_loss, "   Accuracy: ", avg_acc)
+
+    quit()
         # texts = [example["text"] for example in batch_examples]
         # entity_spans = [example["entity_spans"] for example in batch_examples]
 
