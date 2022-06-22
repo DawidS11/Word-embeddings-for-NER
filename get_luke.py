@@ -13,6 +13,10 @@ from tqdm import tqdm, trange
 from transformers import LukeTokenizer, LukeForEntitySpanClassification, LukeModel
 
 from keras.preprocessing.sequence import pad_sequences
+import torch.optim as optim
+from train import loss_fun as loss_fun
+from train import accuracy as accuracy
+import torch.nn.functional as F
 
 
 def load_documents(dataset_file):
@@ -20,6 +24,7 @@ def load_documents(dataset_file):
     words = []
     labels = []
     sentence_boundaries = []
+
     with open(dataset_file) as f:
         for line in f:
             line = line.rstrip()
@@ -53,14 +58,28 @@ def load_documents(dataset_file):
     return documents
 
 
-def load_examples(documents):
+def load_examples(documents, val2id):
     examples = []
     max_token_length = 510
     max_mention_length = 30
+    tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
+    final_labels = []
 
     for document in tqdm(documents):
         words = document["words"]
         subword_lengths = [len(tokenizer.tokenize(w)) for w in words]
+
+        #tokenizing labels:
+        labels = []
+        j = -1
+        for i in subword_lengths:
+            j += 1
+            labels.append(val2id[document["labels"][j]])
+            for k in range(i-1):
+                labels.append(-1)
+
+        final_labels.append(labels)
+
         total_subword_length = sum(subword_lengths)
         sentence_boundaries = document["sentence_boundaries"]
 
@@ -138,7 +157,9 @@ def load_examples(documents):
                 original_word_spans=original_word_spans,
             ))
 
-    return examples
+    return_labels = pad_sequences([lab for lab in final_labels],
+                            maxlen=510, dtype="long", value=-1, truncating="post", padding="post")
+    return examples, return_labels
 
 
 def is_punctuation(char):
@@ -151,42 +172,25 @@ def is_punctuation(char):
     return False
 
 
+class ModelLuke(nn.Module):
+    def __init__(self):
+        super(ModelLuke, self).__init__()
 
+        self.embedding = LukeModel.from_pretrained("studio-ousia/luke-base")
+        self.tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
 
-if __name__ == '__main__':
-    cuda = torch.cuda.is_available()
-    torch.manual_seed(2022)
-    if cuda:
-        torch.cuda.manual_seed(2022)
+        for param in self.embedding.parameters():
+            param.requires_grad = False   
 
-    # Load the model checkpoint
-    model = LukeModel.from_pretrained("studio-ousia/luke-base")
-    model.eval()
-    if cuda:
-        model.cuda()
-    else:
-        model()
-    lstm = nn.LSTM(768, 100, batch_first=True)
-    dropout = nn.Dropout(0.3)
-    fc = nn.Linear(100, 9)
+        self.lstm = nn.LSTM(768, 100, batch_first=True)
+        self.dropout = nn.Dropout(0.3)
+        self.fc = nn.Linear(100, 9)
 
-    # Load the tokenizer
-    tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
-
-    for param in model.parameters():
-        param.requires_grad = False  
-
-    batch_size = 2
-    all_logits = []
-    test_documents = load_documents("data/conll2003/test.txt")
-    test_examples = load_examples(test_documents)
-
-    for batch_start_idx in trange(0, len(test_examples), batch_size):
-        batch_examples = test_examples[batch_start_idx:batch_start_idx + batch_size]
+    def forward(self, batch_examples):
         texts = [example["text"] for example in batch_examples]
         entity_spans = [example["entity_spans"] for example in batch_examples]
 
-        inputs = tokenizer(texts, entity_spans=entity_spans, return_tensors="pt", padding=True)
+        inputs = self.tokenizer(texts, entity_spans=entity_spans, return_tensors="pt", padding=True)
 
         attention_mask2 = inputs["attention_mask"]
         entity_attention_mask = inputs["entity_attention_mask"]
@@ -211,18 +215,129 @@ if __name__ == '__main__':
             entity_ids = entity_ids.cuda()
             entity_position_ids = entity_position_ids.cuda()
 
-        outputs = model(inputs, attention_mask = attention_mask, entity_attention_mask=entity_attention_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids).cuda()
+        outputs = self.embedding(inputs, attention_mask = attention_mask, entity_attention_mask=entity_attention_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids)
         outputs = outputs[0]
 
-        x, _ = lstm(outputs)
+        x, _ = self.lstm(outputs)
         x = x.contiguous()
         x = x.view(-1, x.shape[2])
-        x = dropout(x)
-        x = fc(x)
-        all_logits.extend(x.logits.tolist())
+        x = self.dropout(x)
+        x = self.fc(x)
+        #all_logits.extend(x.logits.tolist())
+
+        return F.log_softmax(x, dim=1)
 
 
-    final_labels = [label for document in test_documents for label in document["labels"]]
+
+if __name__ == '__main__':
+    cuda = torch.cuda.is_available()
+    torch.manual_seed(2022)
+    if cuda:
+        torch.cuda.manual_seed(2022)
+
+    # Load the model checkpoint
+    # model = LukeModel.from_pretrained("studio-ousia/luke-base")
+    # model.eval()
+    # if cuda:
+    #     model.cuda()
+    # else:
+    #     model()
+    # lstm = nn.LSTM(768, 100, batch_first=True)
+    # dropout = nn.Dropout(0.3)
+    # fc = nn.Linear(100, 9)
+
+    # Load the tokenizer
+    # tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
+
+    # for param in model.parameters():
+    #     param.requires_grad = False  
+
+    batch_size = 2
+    all_logits = []
+    train_documents = load_documents("data/conll2003/train.txt")
+
+    list_labels = []
+    for i in range(len(train_documents)):
+        for l in train_documents[i]["labels"]:
+            list_labels.append(l)
+    tags_vals = list(set(list_labels))
+    val2id = {t: i for i, t in enumerate(tags_vals)}
+    id2val = {i: t for i, t in enumerate(tags_vals)}
+
+    train_examples, final_labels = load_examples(train_documents, val2id)
+    model = ModelLuke().cuda() if cuda else ModelLuke()
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    criterion = loss_fun
+
+    model.train()
+    total_loss = 0.0
+    total_acc = 0.0
+    num_batches = 0
+    for batch_start_idx in trange(0, len(train_examples), batch_size):
+        num_batches += 1
+        batch_examples = train_examples[batch_start_idx:batch_start_idx + batch_size]
+        batch_labels = final_labels[batch_start_idx:batch_start_idx + batch_size]
+        outputs = model(batch_examples)         # dlugosc 1020
+
+        batch_labels = torch.LongTensor(batch_labels)
+        if cuda:
+            batch_labels = batch_labels.cuda()
+
+        loss = criterion(outputs, batch_labels)
+        optimizer.zero_grad()
+        loss.backward()
+
+        optimizer.step()
+
+        outputs = outputs.data.cpu().numpy()
+        batch_labels = batch_labels.data.cpu().numpy()
+
+        total_loss += loss.item()
+        total_acc += accuracy(outputs, batch_labels)
+
+        avg_loss = total_loss / num_batches
+        avg_acc = total_acc / num_batches
+
+        # texts = [example["text"] for example in batch_examples]
+        # entity_spans = [example["entity_spans"] for example in batch_examples]
+
+        # inputs = tokenizer(texts, entity_spans=entity_spans, return_tensors="pt", padding=True)
+
+        # attention_mask2 = inputs["attention_mask"]
+        # entity_attention_mask = inputs["entity_attention_mask"]
+        # inputs2 = inputs["input_ids"]
+        # entity_ids = inputs["entity_ids"]
+        # entity_position_ids = inputs["entity_position_ids"]
+
+        # inputs = pad_sequences([sen for sen in inputs2],
+        #                     maxlen=510, dtype="long", truncating="post", padding="post")
+        # attention_mask = pad_sequences([mask for mask in attention_mask2],
+        #                     maxlen=510, dtype="long", value=0, truncating="post", padding="post")
+
+        # if cuda:
+        #     attention_mask = torch.LongTensor(attention_mask)
+        #     entity_attention_mask = torch.LongTensor(entity_attention_mask)
+        #     inputs = torch.LongTensor(inputs)
+        #     entity_ids = torch.LongTensor(entity_ids)
+        #     entity_position_ids = torch.LongTensor(entity_position_ids)
+        #     attention_mask = attention_mask.cuda()
+        #     entity_attention_mask = entity_attention_mask.cuda()
+        #     inputs = inputs.cuda()
+        #     entity_ids = entity_ids.cuda()
+        #     entity_position_ids = entity_position_ids.cuda()
+
+        # outputs = model(inputs, attention_mask = attention_mask, entity_attention_mask=entity_attention_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids).cuda()
+        # outputs = outputs[0]
+
+        # x, _ = lstm(outputs)
+        # x = x.contiguous()
+        # x = x.view(-1, x.shape[2])
+        # x = dropout(x)
+        # x = fc(x)
+        # all_logits.extend(x.logits.tolist())
+
+
+    # final_labels = [label for document in test_documents for label in document["labels"]]         # lista labeli calego dokumentu o dlugosci 203621
 
     final_predictions = []
     for example_index, example in enumerate(test_examples):
@@ -234,7 +349,7 @@ if __name__ == '__main__':
         for logit, index, span in zip(max_logits, max_indices, original_spans):
             if index != 0:  # the span is not NIL
                 predictions.append((logit, span, model.config.id2label[index]))
-
+                                                                                                    # predictions[last]: [(5.666662693023682, (3, 5), 'ORG'), (9.379473686218262, (10, 11), 'LOC'), (6.54561710357666, (30, 32), 'MISC'), (4.933742523193359, (39, 40), 'PER')]
         # construct an IOB2 label sequence
         predicted_sequence = ["O"] * len(example["words"])
         for _, span, label in sorted(predictions, key=lambda o: o[0], reverse=True):
