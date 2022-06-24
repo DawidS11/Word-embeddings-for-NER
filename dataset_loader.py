@@ -15,7 +15,8 @@ class DatasetLoader(object):
             self.dataset = KaggleDataset(params)  
         elif params.dataset_name == "conll2003":
             self.dataset = Conll2003Dataset(params) 
-        self.tags = self.dataset.tags
+        self.val2id = self.dataset.val2id
+        self.id2val = self.dataset.id2val
 
     def load_data(self, case, params):
         data = {}
@@ -25,19 +26,19 @@ class DatasetLoader(object):
         if case == "train":
             sentences = self.dataset.train_sentences
             for sen in self.dataset.train_labels:
-                l = [self.tags[label] for label in sen]
+                l = [self.val2id[label] for label in sen]
                 labels.append(l) 
 
         elif case == "val":
             sentences = self.dataset.val_sentences
             for sen in self.dataset.val_labels:
-                l = [self.tags[label] for label in sen]
+                l = [self.val2id[label] for label in sen]
                 labels.append(l)
 
         elif case == "test":
             sentences = self.dataset.test_sentences
             for sen in self.dataset.test_labels:
-                l = [self.tags[label] for label in sen]
+                l = [self.val2id[label] for label in sen]
                 labels.append(l) 
 
         else:

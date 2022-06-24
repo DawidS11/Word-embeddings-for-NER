@@ -4,6 +4,7 @@ import torch.optim as optim
 import torch.nn as nn
 from tqdm import trange
 import time
+import gc
 
 from model import Model
 from dataset_loader import DatasetLoader #, MyDataset
@@ -42,8 +43,10 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, params):
     total_loss = 0.0
     total_acc = 0.0
 
-    for batch in range(num_batches):
-
+    batches = trange(num_batches)
+    for batch in batches:
+        # gc.collect()
+        # torch.cuda.empty_cache()
         sentences, labels = next(data_eval_iterator)
 
         outputs, labels = model(sentences, labels)
@@ -74,7 +77,8 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params)
 
     batches = trange(num_batches)
     for batch in batches:
-
+        # gc.collect()
+        # torch.cuda.empty_cache()
         sentences, labels = next(data_train_iterator)
 
         outputs, labels = model(sentences, labels)
@@ -117,12 +121,13 @@ if __name__ == '__main__':
 
     # Getting data:
     dataset_loader = DatasetLoader(params)
+    id2val = dataset_loader.id2val
     data_train = dataset_loader.load_data("train", params)
     data_val = dataset_loader.load_data("val", params)
     # data_train = MyDataset("train", data_loader, params)
     # data_val = MyDataset("val", data_loader, params)
 
-    model = Model(params).cuda() if params.cuda else Model(params)
+    model = Model(params, id2val).cuda() if params.cuda else Model(params, id2val)
     optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
  
     criterion = loss_fun
@@ -136,7 +141,8 @@ if __name__ == '__main__':
     
     
     for epoch in range(params.num_epochs):
-
+        # gc.collect()
+        # torch.cuda.empty_cache()
         print("Epoch {}/{}".format(epoch + 1, params.num_epochs), )
 
         start_train_time = time.time()
@@ -151,7 +157,8 @@ if __name__ == '__main__':
         print("Average train accuracy: ", avg_acc)
         print("Training time: ", train_time)
 
-
+        # gc.collect()
+        # torch.cuda.empty_cache()
         # Validation:
         num_batches = (params.val_size + 1) // params.val_batch_size
         data_val_iterator = dataset_loader.data_iterator(data_val, params.val_size, params.val_batch_size, params, shuffle=False)
@@ -172,7 +179,8 @@ if __name__ == '__main__':
 
     
     print("\n\nTesting...")
-
+    # gc.collect()
+    # torch.cuda.empty_cache()
     data_test = dataset_loader.load_data("test", params)
 
     start_test_time = time.time()

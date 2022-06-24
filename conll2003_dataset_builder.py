@@ -63,9 +63,11 @@ class Conll2003Dataset(object):
         dataset_labels = self.train_labels + self.val_labels + self.test_labels
         list_labels = [l for lab in dataset_labels for l in lab]
         tags_vals = list(set(list_labels))
-        self.tags = {t: i for i, t in enumerate(tags_vals)}
+        #self.tags = {t: i for i, t in enumerate(tags_vals)}
+        self.val2id = {t: i for i, t in enumerate(tags_vals)}
+        self.id2val = {i: t for i, t in enumerate(tags_vals)}
 
-        params.num_of_tags = len(self.tags)
+        params.num_of_tags = len(self.val2id)
         params.max_sen_len = max([len(s) for s in dataset_labels])
 
         if params.wb_method.lower() == 'glove':
