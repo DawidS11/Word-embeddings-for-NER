@@ -3,7 +3,9 @@ import pandas as pd
 import os
 from collections import Counter
 
+from get_context import get_context_conll2003
 from get_glove import get_glove, create_vocab
+
 
 def load_dataset(dataset_path):
 
@@ -29,6 +31,47 @@ def load_dataset(dataset_path):
     return sentences, labels
 
 
+def load_documents(dataset_file):
+    documents = []
+    words = []
+    labels = []
+    sentences = []
+    sentences_labels = []
+
+    with open(dataset_file) as f:
+        for line in f:
+            line = line.rstrip()
+            if line.startswith("-DOCSTART"):
+                if sentences:
+                    documents.append(dict(
+                        sentences=sentences,
+                        sentences_labels=sentences_labels,
+                    ))
+                    sentences = []
+                    sentences_labels = []
+
+                continue
+
+            if not line:
+                if words:
+                    sentences.append(words)
+                    sentences_labels.append(labels)
+                    words = []
+                    labels = []
+            else:
+                items = line.split(" ")
+                words.append(items[0])
+                labels.append(items[-1])
+
+    if words:
+        documents.append(dict(
+            sentences=sentences,
+            sentences_labels=sentences_labels,
+        ))
+
+    return documents
+
+
 class Conll2003Dataset(object):
     def __init__(self, params):
         
@@ -50,6 +93,14 @@ class Conll2003Dataset(object):
         self.val_sentences, self.val_labels = load_dataset(val_dataset_path)
         self.test_sentences, self.test_labels = load_dataset(test_dataset_path)
 
+        self.train_documents = load_documents(train_dataset_path)
+        self.val_documents = load_documents(val_dataset_path)
+        self.test_documents = load_documents(test_dataset_path)
+
+        self.train_context = get_context_conll2003(self.train_documents, params)
+        self.val_context = get_context_conll2003(self.val_documents, params)
+        self.test_context = get_context_conll2003(self.test_documents, params)
+
         # Assert sentences and labels lengths:
         assert len(self.train_sentences) == len(self.train_labels)
         assert len(self.val_sentences) == len(self.val_labels)
@@ -70,7 +121,7 @@ class Conll2003Dataset(object):
         params.num_of_tags = len(self.val2id)
         params.max_sen_len = max([len(s) for s in dataset_labels])
 
-        if params.wb_method.lower() == 'glove':
+        if params.we_method.lower() == 'glove':
             create_vocab(self.train_sentences, self.val_sentences, self.test_sentences, params)
             get_glove(params)
 
