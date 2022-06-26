@@ -51,14 +51,11 @@ def get_context_conll2003(documents, params):
         labels_flat = sum(document["sentences_labels"], [])
         subword_lengths = [len(tokenizer.tokenize(w)) for w in sentences_flat]
         total_subword_length = sum(subword_lengths)
-        
+
         sentence_beg = 0     
         sentence_end = 0
-        context_beg = 0
-        context_end = 0
         for sen, lab in zip(document["sentences"], document["sentences_labels"]):
-            
-            sentence_end += len(sen)
+            sentence_end += (len(sen) - 1)
 
             if total_subword_length <= params.max_context_len:
                 contexts.append(dict(
@@ -73,7 +70,25 @@ def get_context_conll2003(documents, params):
                 context_end = sentence_end
                 cur_length = sum(subword_lengths[context_beg:context_end])
                 while True:
-                    pass
+                    if context_beg > 0:
+                        if cur_length + subword_lengths[context_beg - 1] <= params.max_context_len:
+                            cur_length += subword_lengths[context_beg - 1]
+                            context_beg -= 1
+                        else:
+                            break
+                    if context_end < len(sentences_flat):
+                        if cur_length + subword_lengths[context_end] <= params.max_context_len:
+                            cur_length += subword_lengths[context_end]
+                            context_end += 1
+                        else:
+                            break
+                contexts.append(dict(
+                    sentence=sen,
+                    labels=lab,
+                    context_sentences=sentences_flat[context_beg:context_end],
+                    context_labels=labels_flat[context_beg:context_end],
+                ))
 
-
-            sentence_beg += (sentence_end + 1)
+            sentence_beg += len(sen)
+    
+    return contexts
