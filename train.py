@@ -34,7 +34,11 @@ def accuracy(outputs, labels):
 
     outputs = np.argmax(outputs, axis=1)
 
-    return np.sum(outputs == labels)/float(np.sum(mask))
+    if float(np.sum(mask)) > 0.0:
+        acc = np.sum(outputs == labels)/float(np.sum(mask)) 
+    else:
+        acc = 0
+    return acc
 
 
 def evaluate(model, criterion, data_eval_iterator, num_batches, params):
@@ -47,10 +51,9 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, params):
     for batch in batches:
         # gc.collect()
         # torch.cuda.empty_cache()
-        sentences, labels = next(data_eval_iterator)
+        sentences, labels, contexts = next(data_eval_iterator)
 
-        outputs, labels = model(sentences, labels)
-        #outputs = model(sentences)
+        outputs, labels = model(sentences, labels, contexts)
 
         labels = torch.LongTensor(labels)
         if params.cuda:
@@ -79,10 +82,9 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params)
     for batch in batches:
         # gc.collect()
         # torch.cuda.empty_cache()
-        sentences, labels = next(data_train_iterator)
+        sentences, labels, contexts = next(data_train_iterator)
 
-        outputs, labels = model(sentences, labels)
-        #outputs = model(sentences)
+        outputs, labels = model(sentences, labels, contexts)
 
         labels = torch.LongTensor(labels)
         if params.cuda:
@@ -133,12 +135,11 @@ if __name__ == '__main__':
     criterion = loss_fun
     
 
-    print("Training...")
+    print("\n\nTraining...")
     best_acc = -1.0
     best_epoch = -1
     best_epoch_loss = -1.0
     total_time = 0.0
-    
     
     for epoch in range(params.num_epochs):
         # gc.collect()
@@ -155,7 +156,8 @@ if __name__ == '__main__':
         train_time = end_train_time - start_train_time
         print("Average train loss: ", avg_loss)
         print("Average train accuracy: ", avg_acc)
-        print("Training time: ", train_time)
+        print("Training time: ", train_time, "\n")
+        total_time += train_time
 
         # gc.collect()
         # torch.cuda.empty_cache()
@@ -166,9 +168,10 @@ if __name__ == '__main__':
 
         end_val_time = time.time()
         val_time = end_val_time - end_train_time
-        print("\nAverage val loss: ", avg_loss)
+        print("Average val loss: ", avg_loss)
         print("Average val accuracy: ", avg_acc)
         print("Validation time: ", val_time, "\n\n")
+        total_time += val_time
 
         if avg_acc > best_acc:
             best_acc = avg_acc
@@ -189,5 +192,7 @@ if __name__ == '__main__':
     avg_loss, avg_acc = evaluate(model, criterion, data_test_iterator, num_batches, params)
     end_test_time = time.time()
     test_time = start_test_time - end_test_time
+    total_time += test_time
 
     print("Test accuracy: {:05.3f} with the loss: {:05.3f}".format(avg_acc, avg_loss))
+    print("Total time: {:05.3f}". format(total_time))

@@ -28,30 +28,35 @@ class DatasetLoader(object):
             for sen in self.dataset.train_labels:
                 l = [self.val2id[label] for label in sen]
                 labels.append(l) 
+            contexts = self.dataset.train_contexts
 
         elif case == "val":
             sentences = self.dataset.val_sentences
             for sen in self.dataset.val_labels:
                 l = [self.val2id[label] for label in sen]
                 labels.append(l)
+            contexts = self.dataset.val_contexts
 
         elif case == "test":
             sentences = self.dataset.test_sentences
             for sen in self.dataset.test_labels:
                 l = [self.val2id[label] for label in sen]
                 labels.append(l) 
+            contexts = self.dataset.test_contexts
 
         else:
             print("Wrong case.")
 
         data['sentences'] = sentences
         data['labels'] = labels
+        data['contexts'] = contexts
         return data
 
 
     def data_iterator(self, data, dataset_size, batch_size, params, shuffle=False):
 
-        data_len = len(data['sentences'])
+        #data_len = len(data['sentences'])
+        data_len = len(data['contexts'])
         order = list(range(data_len))      
 
         if shuffle:
@@ -60,10 +65,16 @@ class DatasetLoader(object):
 
         num_batches = (dataset_size + 1) // batch_size
         for i in range(num_batches):
-            batch_sentences = [data['sentences'][idx] for idx in order[i*batch_size : (i+1)*batch_size]]
-            batch_tags = [data['labels'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
+            # batch_sentences = [data['sentences'][idx] for idx in order[i*batch_size : (i+1)*batch_size]]
+            # batch_labels = [data['labels'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
+            batch_sentences = [data['contexts'][idx]['context_text'] for idx in order[i*batch_size : (i+1)*batch_size]]
+            batch_labels = [data['contexts'][idx]['context_labels'] for idx in order[i*batch_size:(i+1)*batch_size]]
+            if params.dataset_name == 'conll2003':
+                batch_contexts = [data['contexts'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
+            else:
+                batch_contexts = []
     
-            yield batch_sentences, batch_tags
+            yield batch_sentences, batch_labels, batch_contexts
 
 
 

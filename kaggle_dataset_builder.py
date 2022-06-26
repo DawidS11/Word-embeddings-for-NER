@@ -4,6 +4,7 @@ import os
 from collections import Counter
 
 from get_glove import get_glove, create_vocab
+#from get_context import get_context_kaggle
 
 class GetSentences(object):
     
@@ -40,21 +41,32 @@ class KaggleDataset(object):
         dataset_pd = dataset_pd.fillna(method="ffill")
 
         sentences = GetSentences(dataset_pd)
-        #self.dataset_sentences = [" ".join([s[0] for s in sent]) for sent in sentences.sentences]
+
+        self.dataset_sentences = [" ".join([s[0] for s in sent]) for sent in sentences.sentences]
+        print(self.dataset_sentences[0])
+        print(self.dataset_sentences[1])
+        print(self.dataset_sentences[2])
+        print(self.dataset_sentences[3])
+        print(self.dataset_sentences[4])
+        print(self.dataset_sentences[5])
+        quit()
         self.dataset_sentences = [[s[0] for s in sen] for sen in sentences.sentences]
         self.dataset_labels  = [[s[2] for s in sen] for sen in sentences.sentences]
         
         # Creating sets of sentences and labels for train, val and test:
         self.train_sentences = self.dataset_sentences[:int(params.train_dataset_size*len(self.dataset_sentences))]
         self.train_labels = self.dataset_labels[:int(params.train_dataset_size*len(self.dataset_labels))]
+        self.train_contexts = []
 
         self.val_sentences = self.dataset_sentences[int(params.train_dataset_size*len(self.dataset_sentences)) \
             : int((params.train_dataset_size + params.val_dataset_size)*len(self.dataset_sentences))]
         self.val_labels = self.dataset_labels[int(params.train_dataset_size*len(self.dataset_labels)) \
             : int((params.train_dataset_size + params.val_dataset_size)*len(self.dataset_labels))]
+        self.val_contexts = []
 
         self.test_sentences = self.dataset_sentences[int((1.0 - params.val_dataset_size)*len(self.dataset_sentences)):]
         self.test_labels = self.dataset_labels[int((1.0 - params.val_dataset_size)*len(self.dataset_labels)):]
+        self.test_contexts = []
 
         # Assert sentences and labels lengths:
         assert len(self.train_sentences) == len(self.train_labels)
@@ -74,59 +86,8 @@ class KaggleDataset(object):
         params.num_of_tags = len(self.val2id)
         params.max_sen_len = max([len(s) for s in self.dataset_labels])
 
-        if params.wb_method.lower() == 'glove':
+        if params.we_method.lower() == 'glove':
             create_vocab(self.train_sentences, self.val_sentences, self.test_sentences, params)
             get_glove(params)
 
         print("Init KaggleDataset done.")
-
-
-    # def update_vocab(self, dataset, vocab):        
-    #     for sen in dataset:
-    #         vocab.update(sen)
-
-    # def create_vocab(self, params):
-    #     self.update_vocab(self.train_sentences, self.words)
-    #     self.update_vocab(self.val_sentences, self.words)
-    #     self.update_vocab(self.test_sentences, self.words)
-
-    #     self.words = [tok for tok, count in self.words.items() if count >= 1]
-
-    #     if params.pad_word not in self.words: self.words.append(params.pad_word)
-
-    #     self.words.append(params.unk_word)
-
-    #     params.vocab_size = len(self.words)
-
-    #     # Saving vocab:
-    #     with open(os.path.join(params.data_dir, 'words.txt'), "w") as f:
-    #         for word in self.words:
-    #             f.write(word + '\n')
-
-    # def get_glove(self, params):
-    #     vocab = {j.strip(): i for i, j in enumerate(open(os.path.join(params.data_dir, 'words.txt')), 0)}
-    #     id2word = {vocab[i]: i for i in vocab}
-
-    #     dim = 0
-    #     w2v = {}
-    #     for line in open(os.path.join(params.glove_dir, 'glove.6B.{}d.txt'.format(params.glove_dim))):
-    #         line = line.strip().split()
-    #         word = line[0]
-    #         vec = list(map(float, line[1:]))
-    #         dim = len(vec)
-    #         w2v[word] = vec
-
-    #     vecs = []
-    #     vecs.append(np.random.uniform(low=-1.0, high=1.0, size=dim))
-
-    #     for i in range(1, len(vocab) - 1):
-    #         if id2word[i] in w2v:
-    #             vecs.append(w2v[id2word[i]])
-    #         else:
-    #             vecs.append(vecs[0])
-    #     vecs.append(np.zeros(dim))
-    #     assert(len(vecs) == len(vocab))
-
-    #     np.save(os.path.join(params.glove_dir, 'glove_{}d.npy'.format(dim)), np.array(vecs, dtype=np.float32))
-    #     np.save(os.path.join(params.glove_dir, 'word2id.npy'), vocab)
-    #     np.save(os.path.join(params.glove_dir, 'id2word.npy'), id2word)

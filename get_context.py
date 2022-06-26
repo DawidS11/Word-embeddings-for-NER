@@ -35,9 +35,9 @@ from transformers import BertTokenizer, RobertaTokenizer, LukeTokenizer
 
 
 
-def get_context_conll2003(documents, params):
+def get_context_conll2003(documents, params, val2id):
     
-    if params.we_method.lower() == 'bert':
+    if params.we_method.lower() == 'bert' or params.we_method.lower() == 'glove':
         tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
     elif params.we_method.lower() == 'roberta':
         tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
@@ -45,25 +45,34 @@ def get_context_conll2003(documents, params):
         tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
     
     contexts = []
-
+    for document in documents:
+        sentences_flat = sum(document["sentences"], [])
+        if not sentences_flat:
+            print("qwewqdsdasd")
+            quit()
     for document in documents:
         sentences_flat = sum(document["sentences"], [])
         labels_flat = sum(document["sentences_labels"], [])
+        text_labels = [val2id[lab] for lab in labels_flat]
         subword_lengths = [len(tokenizer.tokenize(w)) for w in sentences_flat]
         total_subword_length = sum(subword_lengths)
 
         sentence_beg = 0     
         sentence_end = 0
         for sen, lab in zip(document["sentences"], document["sentences_labels"]):
-            sentence_end += (len(sen) - 1)
+            lab = [val2id[l] for l in lab]
+            sentence_end += len(sen)
 
             if total_subword_length <= params.max_context_len:
-                contexts.append(dict(
-                    sentence=sen,
-                    labels=lab,
-                    context_sentences=sentences_flat,
-                    context_labels=labels_flat,
-                ))
+                if sentence_beg != sentence_end:
+                    contexts.append(dict(
+                        sentence=sen,
+                        labels=lab,
+                        context_text=sentences_flat,
+                        context_labels=text_labels,
+                        sentence_beg=sentence_beg,
+                        sentence_end=sentence_end,
+                    ))
 
             else:
                 context_beg = sentence_beg
@@ -82,13 +91,16 @@ def get_context_conll2003(documents, params):
                             context_end += 1
                         else:
                             break
-                contexts.append(dict(
-                    sentence=sen,
-                    labels=lab,
-                    context_sentences=sentences_flat[context_beg:context_end],
-                    context_labels=labels_flat[context_beg:context_end],
-                ))
+                if context_beg != context_end:
+                    contexts.append(dict(
+                        sentence=sen,
+                        labels=lab,
+                        context_text=sentences_flat[context_beg:context_end],
+                        context_labels=text_labels[context_beg:context_end],
+                        sentence_beg=sentence_beg,
+                        sentence_end=sentence_end,
+                    ))
 
             sentence_beg += len(sen)
-    
+
     return contexts
