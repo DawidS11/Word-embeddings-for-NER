@@ -62,7 +62,7 @@ def get_context_conll2003(documents, params, val2id):
         for sen, lab in zip(document["sentences"], document["sentences_labels"]):
             lab = [val2id[l] for l in lab]
             sentence_end += len(sen)
-
+            
             if total_subword_length <= params.max_context_len:
                 if sentence_beg != sentence_end:
                     contexts.append(dict(
@@ -97,8 +97,8 @@ def get_context_conll2003(documents, params, val2id):
                         labels=lab,
                         context_text=sentences_flat[context_beg:context_end],
                         context_labels=text_labels[context_beg:context_end],
-                        sentence_beg=sentence_beg,
-                        sentence_end=sentence_end,
+                        sentence_beg=sentence_beg-context_beg,
+                        sentence_end=sentence_end-context_beg,
                     ))
 
             sentence_beg += len(sen)
