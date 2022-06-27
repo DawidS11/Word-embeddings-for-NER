@@ -1,43 +1,25 @@
 from transformers import BertTokenizer, RobertaTokenizer, LukeTokenizer
 
-# bert_tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
-# roberta_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
-# luke_tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
 
-# def get_context_kaggle(dataset, params):
-    # '''
-    # dataset - list of lists of words
-    # '''
+def get_context_kaggle(sentences, labels):
 
-    # if params.we_method.lower() == 'bert':
-    #     tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
-    # elif params.we_method.lower() == 'roberta':
-    #     tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
-    # elif params.we_method.lower() == 'luke':
-    #     tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
-    
-    # dataset_flat = sum(dataset, [])      # list of words
-    
-    # sentence_beg = 0     # indeks pierwszego słowa w zdaniu
-    # sentence_end = 0     # indeks ostatniego słowa w zdaniu
-    # for sen in dataset:
-    #     sentence_end += len(sen)
-
-    #     subword_lengths = [len(tokenizer.tokenize(w)) for w in sen]
-    #     total_subword_length = sum(subword_lengths)
-
-    #     if total_subword_length <= params.max_context_len:
-    #         context_beg = sentence_beg
-    #         context_end = sentence_end
-
-    #     sentence_beg += (sentence_end + 1)
-
-
+    contexts = []
+    for sen, lab in zip(sentences, labels):
+        sen_str = " ".join(sen)
+        contexts.append(dict(
+            sentence=sen,
+            labels=lab,
+            context_text=sen,
+            context_labels=lab,
+            sentence_beg=0,
+            sentence_end=len(sen_str),
+        ))
+    return contexts
 
 
 def get_context_conll2003(documents, params, val2id):
     
-    if params.we_method.lower() == 'bert' or params.we_method.lower() == 'glove':
+    if params.we_method.lower() == 'bert' or params.we_method.lower() == 'glove' or params.we_method.lower() == 'elmo':
         tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
     elif params.we_method.lower() == 'roberta':
         tokenizer = RobertaTokenizer.from_pretrained("roberta-base")

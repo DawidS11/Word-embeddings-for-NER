@@ -1,8 +1,5 @@
 import numpy as np
 import os
-
-#os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,11 +14,12 @@ from keras.preprocessing.sequence import pad_sequences
 
 class Model(nn.Module):
 
-    def __init__(self, params, id2val, val2id_entity):
+    def __init__(self, params, id2val, val2id, val2id_entity):
         super(Model, self).__init__()
 
         self.params = params
         self.id2val = id2val
+        self.val2id = val2id
         self.val2id_entity = val2id_entity
         self.dropout = nn.Dropout(params.dropout)
 
@@ -96,16 +94,21 @@ class Model(nn.Module):
     def forward(self, sentences, labels, contexts):
         
         if self.we_method == "glove":
-            max_len = max(map(lambda x: len(x), sentences), default=0)                                                                          # DEFAULT
+            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            labels_vals = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+            labels = [[self.val2id[l] for l in lab] for lab in labels_vals]
+            max_num = max([len(s) for s in sentences])
+
+            max_len = max(map(lambda x: len(x), sentences))#, default=0)                                                                          # DEFAULT
             sentences = list(map(lambda x: list(map(lambda w: self.word2id.get(w, 0), x)), sentences))
             sentences = list(map(lambda x: x + [self.params.vocab_size-1] * (max_len - len(x)), sentences))
 
             sentences = pad_sequences([[w for w in sen] for sen in sentences],
-                          maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
+                          maxlen=max_num, dtype="long", truncating="post", padding="post")
 
 
             labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
+                maxlen=max_num, value=self.params.pad_tag_num, padding="post",      
                 dtype="long", truncating="post")
 
 
@@ -116,12 +119,15 @@ class Model(nn.Module):
             x = self.embedding(sentences)
         
         elif self.we_method == 'elmo':
-            # sentences = pad_sequences([[w for w in sen] for sen in sentences],
-            #               maxlen=self.params.max_sen_len, value=self.params.pad_word, dtype="long", truncating="post", padding="post")
+            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            labels_vals = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+            labels = [[self.val2id[l] for l in lab] for lab in labels_vals]
+            max_num = max([len(s) for s in sentences])
+
             sentences_padded = []
             tmp_sen = []
             for sen in sentences:
-                for i in range(self.params.max_sen_len):
+                for i in range(max_num):
                     if i < len(sen):
                         tmp_sen.append(sen[i])
                     else:
@@ -132,7 +138,7 @@ class Model(nn.Module):
             sentences = batch_to_ids(sentences_padded)
 
             labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
+                maxlen=max_num, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
                 dtype="long", truncating="post")
 
             sentences = torch.LongTensor(sentences)
@@ -262,42 +268,8 @@ class Model(nn.Module):
 
 
         elif self.we_method == 'luke':
-            # original_labels = [context["labels"] for context in contexts]
-            # original_labels = pad_sequences([[l for l in lab] for lab in labels],
-            #     maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",
-            #     dtype="long", truncating="post")
-
-            # tokenized_word = [] 
-            # tokenized_labels = []
-            # tokenized_sen_labels = []
-            # idx = -1
-            # is_first = True
-
-            # for sen, lab in zip(sentences, labels):
-            #     idx = -1
-            #     for word in sen:
-            #         idx += 1
-            #         tokenized_word = self.tokenizer.tokenize(word)
-
-            #         is_first = True
-            #         for token in tokenized_word:
-            #             if is_first:
-            #                 tokenized_sen_labels.append(lab[idx])
-            #                 is_first = False
-            #             else:
-            #                 tokenized_sen_labels.append(-1)
-
-            #     tokenized_labels.append(tokenized_sen_labels)
-            #     tokenized_sen_labels = []
-            # for lab in tokenized_labels:
-            #     if lab[0] != -1:            
-            #         lab.insert(0, -1)
-            #         lab.append(-1)
-
-            # entity_spans, empty = calc_entity_spans(sentences, labels, self.id2val)
-            all_entities, entities, entity_spans, possible_entity_spans = calc_entity_spans(contexts, self.id2val)
             
-
+            all_entities = calc_entity_spans(contexts, self.id2val)
             '''
             all_entities:
             batch_size razy all_context_entities:
@@ -323,13 +295,7 @@ class Model(nn.Module):
                 entity_spans.append(context_spans)
                 entity_labels.append(context_labels)
 
-            # labels = tokenized_labels
-            # labels = pad_sequences([[l for l in lab] for lab in labels],
-            #     maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",
-            #     dtype="long", truncating="post")
-
             max_num = max([len(s) for s in entity_labels])
-            #print(max_num)
             entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
                 maxlen=max_num, value=self.params.pad_tag_num, padding="post",
                 dtype="long", truncating="post")
@@ -337,45 +303,44 @@ class Model(nn.Module):
             texts = [" ".join(sen) for sen in sentences]                # zmienic na contexts
 
             # w przypadku braku encji w batch:
-            empty = False
-            if empty:
-                inputs = self.tokenizer(texts, return_tensors="pt", padding=True)
-            else:
-                inputs = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
-            # print(entity_spans)
-            # print(entities)
-            inputs_emb = inputs
+            # empty = False
+            # if empty:
+            #     inputs = self.tokenizer(texts, return_tensors="pt", padding=True)
+            # else:
+            #     inputs = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
+
+            inputs_emb = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
             #print(inputs_emb['input_ids'].shape)
-            inputs2 = inputs["input_ids"].long()
-            attention_mask2 = inputs["attention_mask"].long()
-            if not empty:
-                entity_attention_mask = inputs["entity_attention_mask"].long()
-                entity_ids = inputs["entity_ids"].long()
-                entity_position_ids = inputs["entity_position_ids"].long()
+            # inputs2 = inputs["input_ids"].long()
+            # attention_mask2 = inputs["attention_mask"].long()
+            # if not empty:
+            #     entity_attention_mask = inputs["entity_attention_mask"].long()
+            #     entity_ids = inputs["entity_ids"].long()
+            #     entity_position_ids = inputs["entity_position_ids"].long()
 
             # inputs = pad_sequences([sen for sen in inputs2],
             #                     maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
             # attention_mask = pad_sequences([mask for mask in attention_mask2],
             #                     maxlen=self.params.max_sen_len, dtype="long", value=0, truncating="post", padding="post")
-            inputs = pad_sequences([sen for sen in inputs2],
-                                maxlen=(self.params.max_context_len+2), dtype="long", truncating="post", padding="post")
-            attention_mask = pad_sequences([mask for mask in attention_mask2],
-                                maxlen=(self.params.max_context_len+2), dtype="long", value=0, truncating="post", padding="post")
+            # inputs = pad_sequences([sen for sen in inputs2],
+            #                     maxlen=(self.params.max_context_len+2), dtype="long", truncating="post", padding="post")
+            # attention_mask = pad_sequences([mask for mask in attention_mask2],
+            #                     maxlen=(self.params.max_context_len+2), dtype="long", value=0, truncating="post", padding="post")
 
-            inputs = torch.LongTensor(inputs)
-            attention_mask = torch.LongTensor(attention_mask)
-            if not empty:
-                entity_attention_mask = torch.LongTensor(entity_attention_mask)
-                entity_ids = torch.LongTensor(entity_ids)
-                entity_position_ids = torch.LongTensor(entity_position_ids)
+            # inputs = torch.LongTensor(inputs)
+            # attention_mask = torch.LongTensor(attention_mask)
+            # if not empty:
+            #     entity_attention_mask = torch.LongTensor(entity_attention_mask)
+            #     entity_ids = torch.LongTensor(entity_ids)
+            #     entity_position_ids = torch.LongTensor(entity_position_ids)
 
-            if self.params.cuda:
-                inputs = inputs.cuda()
-                attention_mask = attention_mask.cuda()
-                if not empty:
-                    entity_attention_mask = entity_attention_mask.cuda()
-                    entity_ids = entity_ids.cuda()
-                    entity_position_ids = entity_position_ids.cuda()
+            # if self.params.cuda:
+            #     inputs = inputs.cuda()
+            #     attention_mask = attention_mask.cuda()
+            #     if not empty:
+            #         entity_attention_mask = entity_attention_mask.cuda()
+            #         entity_ids = entity_ids.cuda()
+            #         entity_position_ids = entity_position_ids.cuda()
 
             # if empty:
             #     outputs = self.embedding(inputs, attention_mask=attention_mask)
@@ -387,17 +352,18 @@ class Model(nn.Module):
             if self.params.cuda:
                 inputs_emb = inputs_emb.to("cuda")
             outputs = self.embedding(**inputs_emb)
+            del inputs_emb
             x = outputs['entity_last_hidden_state']
             #print(x.shape)
             # x = outputs['last_hidden_state']
             # print(x.shape)
             #quit()
-            del inputs
-            del attention_mask
-            if not empty:
-                del entity_attention_mask
-                del entity_ids
-                del entity_position_ids
+            # del inputs
+            # del attention_mask
+            # if not empty:
+            #     del entity_attention_mask
+            #     del entity_ids
+            #     del entity_position_ids
             # gc.collect()
             # torch.cuda.empty_cache()
 
@@ -414,20 +380,23 @@ class Model(nn.Module):
         else:
             print("forward: nn_method nie zostala wybrana")
         
-
-        sentence_tensor = x[0:1, :, :]
-        pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.hidden_dim)
-        if self.params.cuda:
-            pad_tensor = pad_tensor.cuda()
-        sentences_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
-
-        for i in range(1, (len(x))):
-            sentence_tensor = x[i:i+1, :, :]
+        if self.we_method == 'luke':
+            sentence_tensor = x[0:1, :, :]
             pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.hidden_dim)
             if self.params.cuda:
                 pad_tensor = pad_tensor.cuda()
-            sentence_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
-            sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
+            sentences_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
+            del sentence_tensor
+            del pad_tensor
+            for i in range(1, (len(x))):
+                sentence_tensor = x[i:i+1, :, :]
+                pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.hidden_dim)
+                if self.params.cuda:
+                    pad_tensor = pad_tensor.cuda()
+                sentence_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
+                sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
+                del sentence_tensor
+                del pad_tensor
         
         # sentence_tensor = x[0:1, contexts[0]["sentence_beg"]:contexts[0]["sentence_end"], :]
         # pad_tensor = torch.zeros(1, (self.params.max_context_len - len(sentence_tensor[0])), self.params.hidden_dim)
@@ -444,69 +413,15 @@ class Model(nn.Module):
         #     sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
 
 
-        x = sentences_tensor
+            x = sentences_tensor
+            labels = entity_labels
         #print(x.shape)
         x = x.contiguous()
         x = x.view(-1, x.shape[2])
         x = self.dropout(x)
         x = self.fc(x)
 
-        return F.log_softmax(x, dim=1), entity_labels
-
-
-
-# def calc_entity_spans(sentences, labels, id2val):
-#     entity_spans = []
-#     sentence_entity_spans = []
-
-#     beg = 0
-#     end = 0
-#     beg_save = -1
-#     is_first_word = True
-#     for sen, lab in zip(sentences, labels):
-
-#         # sen = sen["context_text"]
-#         # lab = lab["context_labels"]
-
-#         is_first_word = True
-#         beg = 0
-#         end = 0
-#         beg_save = -1
-#         for s, l in zip(sen, lab):
-#             if is_first_word == False:
-#                 end += 1
-
-#             if id2val[l][0] == "B":
-#                 beg_save = beg
-#                 end += len(s)
-#             elif id2val[l][0] == "I":
-#                 end += len(s)
-#             # if l[0] == "B":
-#             #     beg_save = beg
-#             #     end += len(s)
-#             # elif l[0] == "I":
-#             #     end += len(s)
-#             else:
-#                 # save entity span if beg_save != 0
-#                 if beg_save != -1:
-#                     sentence_entity_spans.append((beg_save, (end-1)))
-#                     beg_save = -1
-
-#                 end += len(s)
-#                 beg = end+1
-
-#             is_first_word = False
-#         entity_spans.append(sentence_entity_spans)
-#         sentence_entity_spans = []
-    
-#     i = 0
-#     empty = False
-#     for span in entity_spans:
-#         if not span:
-#             i += 1
-#     if i == len(entity_spans):
-#         empty = True
-#     return entity_spans, empty
+        return F.log_softmax(x, dim=1), labels
 
 
 def calc_entity_spans(contexts, id2val):
@@ -624,4 +539,4 @@ def calc_entity_spans(contexts, id2val):
     #print(all_entities)
     #quit()
 
-    return all_entities, entity_spans_words, entity_spans, possible_entity_spans
+    return all_entities

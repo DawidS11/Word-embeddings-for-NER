@@ -7,8 +7,7 @@ import time
 import gc
 
 from model import Model
-from dataset_loader import DatasetLoader #, MyDataset
-#from torch.utils.data import DataLoader
+from dataset_loader import DatasetLoader
 
 import params
 
@@ -49,8 +48,7 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, params):
 
     batches = trange(num_batches)
     for batch in batches:
-        # gc.collect()
-        # torch.cuda.empty_cache()
+
         sentences, labels, contexts = next(data_eval_iterator)
 
         outputs, labels = model(sentences, labels, contexts)
@@ -80,8 +78,7 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params)
 
     batches = trange(num_batches)
     for batch in batches:
-        # gc.collect()
-        # torch.cuda.empty_cache()
+
         sentences, labels, contexts = next(data_train_iterator)
 
         outputs, labels = model(sentences, labels, contexts)
@@ -124,14 +121,13 @@ if __name__ == '__main__':
     # Getting data:
     dataset_loader = DatasetLoader(params)
     id2val = dataset_loader.id2val
+    val2id = dataset_loader.val2id
     id2val_entity = dataset_loader.id2val_entity
     val2id_entity = dataset_loader.val2id_entity
     data_train = dataset_loader.load_data("train", params)
     data_val = dataset_loader.load_data("val", params)
-    # data_train = MyDataset("train", data_loader, params)
-    # data_val = MyDataset("val", data_loader, params)
 
-    model = Model(params, id2val, val2id_entity).cuda() if params.cuda else Model(params, id2val, val2id_entity)
+    model = Model(params, id2val, val2id, val2id_entity).cuda() if params.cuda else Model(params, id2val, val2id, val2id_entity)
     optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
  
     criterion = loss_fun

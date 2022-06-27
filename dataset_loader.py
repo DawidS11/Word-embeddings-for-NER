@@ -1,8 +1,6 @@
 import numpy as np
 import random
 
-from torch.utils.data import Dataset
-
 from kaggle_dataset_builder import KaggleDataset
 from conll2003_dataset_builder import Conll2003Dataset
 
@@ -67,33 +65,10 @@ class DatasetLoader(object):
 
         num_batches = (dataset_size + 1) // batch_size
         for i in range(num_batches):
-            # batch_sentences = [data['sentences'][idx] for idx in order[i*batch_size : (i+1)*batch_size]]
-            # batch_labels = [data['labels'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
-            batch_sentences = [data['contexts'][idx]['context_text'] for idx in order[i*batch_size : (i+1)*batch_size]]
-            batch_labels = [data['contexts'][idx]['context_labels'] for idx in order[i*batch_size:(i+1)*batch_size]]
-            if params.dataset_name == 'conll2003':
-                batch_contexts = [data['contexts'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
-            else:
-                batch_contexts = []
+            batch_sentences = [data['sentences'][idx] for idx in order[i*batch_size : (i+1)*batch_size]]
+            batch_labels = [data['labels'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
+            # batch_sentences = [data['contexts'][idx]['context_text'] for idx in order[i*batch_size : (i+1)*batch_size]]
+            # batch_labels = [data['contexts'][idx]['context_labels'] for idx in order[i*batch_size:(i+1)*batch_size]]
+            batch_contexts = [data['contexts'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
     
             yield batch_sentences, batch_labels, batch_contexts
-
-
-
-# class MyDataset(Dataset):
-#     def __init__(self, case, dataset, params):
-
-#         if case == "train":
-#             self.data = dataset.load_data("train", params)
-#         elif case == "val":
-#             self.data = dataset.load_data("val", params)
-#         elif case == "test":
-#             self.data = dataset.load_data("test", params)
-#         else:
-#             print("Wrong case.")
-
-#     def __getitem__(self, index):
-#         return self.data['sentences'][index], self.data['labels'][index]
-
-#     def __len__(self):
-#         return len(self.data['sentences'])

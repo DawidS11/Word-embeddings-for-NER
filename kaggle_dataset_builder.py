@@ -4,7 +4,7 @@ import os
 from collections import Counter
 
 from get_glove import get_glove, create_vocab
-#from get_context import get_context_kaggle
+from get_context import get_context_kaggle
 
 class GetSentences(object):
     
@@ -50,17 +50,14 @@ class KaggleDataset(object):
         # Creating sets of sentences and labels for train, val and test:
         self.train_sentences = self.dataset_sentences[:int(params.train_dataset_size*len(self.dataset_sentences))]
         self.train_labels = self.dataset_labels[:int(params.train_dataset_size*len(self.dataset_labels))]
-        self.train_contexts = []
 
         self.val_sentences = self.dataset_sentences[int(params.train_dataset_size*len(self.dataset_sentences)) \
             : int((params.train_dataset_size + params.val_dataset_size)*len(self.dataset_sentences))]
         self.val_labels = self.dataset_labels[int(params.train_dataset_size*len(self.dataset_labels)) \
             : int((params.train_dataset_size + params.val_dataset_size)*len(self.dataset_labels))]
-        self.val_contexts = []
 
         self.test_sentences = self.dataset_sentences[int((1.0 - params.val_dataset_size)*len(self.dataset_sentences)):]
         self.test_labels = self.dataset_labels[int((1.0 - params.val_dataset_size)*len(self.dataset_labels)):]
-        self.test_contexts = []
 
         # Assert sentences and labels lengths:
         assert len(self.train_sentences) == len(self.train_labels)
@@ -79,6 +76,10 @@ class KaggleDataset(object):
         self.id2val = {i: t for i, t in enumerate(tags_vals)}
         self.val2id_entity = {t: i for i, t in enumerate(tags_vals_entity)}
         self.id2val_entity = {i: t for i, t in enumerate(tags_vals_entity)}
+
+        self.train_contexts = get_context_kaggle(self.train_sentences, self.train_labels)
+        self.val_contexts = get_context_kaggle(self.val_sentences, self.val_labels)
+        self.test_contexts = get_context_kaggle(self.test_sentences, self.test_labels)
 
         params.num_of_tags = len(self.val2id)
         params.num_of_tags_entity = len(self.val2id_entity)
