@@ -43,13 +43,7 @@ class KaggleDataset(object):
         sentences = GetSentences(dataset_pd)
 
         self.dataset_sentences = [" ".join([s[0] for s in sent]) for sent in sentences.sentences]
-        print(self.dataset_sentences[0])
-        print(self.dataset_sentences[1])
-        print(self.dataset_sentences[2])
-        print(self.dataset_sentences[3])
-        print(self.dataset_sentences[4])
-        print(self.dataset_sentences[5])
-        quit()
+
         self.dataset_sentences = [[s[0] for s in sen] for sen in sentences.sentences]
         self.dataset_labels  = [[s[2] for s in sen] for sen in sentences.sentences]
         
@@ -79,12 +73,21 @@ class KaggleDataset(object):
 
         # Creating a number representation of labels.
         tags_vals = list(set(dataset_pd["Tag"].values))
-        #self.tags = {t: i for i, t in enumerate(tags_vals)}
+        tags_vals_entity = list(set([tag_val[2:] if tag_val != 'O' else 'NIL' for tag_val in tags_vals]))
+
         self.val2id = {t: i for i, t in enumerate(tags_vals)}
         self.id2val = {i: t for i, t in enumerate(tags_vals)}
+        self.val2id_entity = {t: i for i, t in enumerate(tags_vals_entity)}
+        self.id2val_entity = {i: t for i, t in enumerate(tags_vals_entity)}
 
         params.num_of_tags = len(self.val2id)
+        params.num_of_tags_entity = len(self.val2id_entity)
         params.max_sen_len = max([len(s) for s in self.dataset_labels])
+        max_entity_num = 0
+        for i in range(params.max_sen_len):
+            for j in range(i, params.max_sen_len):
+                max_entity_num += 1
+        params.max_entity_num = max_entity_num
 
         if params.we_method.lower() == 'glove':
             create_vocab(self.train_sentences, self.val_sentences, self.test_sentences, params)

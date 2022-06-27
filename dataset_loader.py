@@ -17,6 +17,8 @@ class DatasetLoader(object):
             self.dataset = Conll2003Dataset(params) 
         self.val2id = self.dataset.val2id
         self.id2val = self.dataset.id2val
+        self.val2id_entity = self.dataset.val2id_entity
+        self.id2val_entity = self.dataset.id2val_entity
 
     def load_data(self, case, params):
         data = {}

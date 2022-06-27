@@ -45,11 +45,7 @@ def get_context_conll2003(documents, params, val2id):
         tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
     
     contexts = []
-    for document in documents:
-        sentences_flat = sum(document["sentences"], [])
-        if not sentences_flat:
-            print("qwewqdsdasd")
-            quit()
+
     for document in documents:
         sentences_flat = sum(document["sentences"], [])
         labels_flat = sum(document["sentences_labels"], [])

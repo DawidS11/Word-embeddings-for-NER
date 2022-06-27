@@ -1,5 +1,8 @@
 import numpy as np
 import os
+
+#os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,11 +17,12 @@ from keras.preprocessing.sequence import pad_sequences
 
 class Model(nn.Module):
 
-    def __init__(self, params, id2val):
+    def __init__(self, params, id2val, val2id_entity):
         super(Model, self).__init__()
 
         self.params = params
         self.id2val = id2val
+        self.val2id_entity = val2id_entity
         self.dropout = nn.Dropout(params.dropout)
 
         self.we_method = params.we_method.lower()
@@ -258,58 +262,90 @@ class Model(nn.Module):
 
 
         elif self.we_method == 'luke':
-            original_labels = [context["labels"] for context in contexts]
-            original_labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",
-                dtype="long", truncating="post")
+            # original_labels = [context["labels"] for context in contexts]
+            # original_labels = pad_sequences([[l for l in lab] for lab in labels],
+            #     maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",
+            #     dtype="long", truncating="post")
 
-            tokenized_word = [] 
-            tokenized_labels = []
-            tokenized_sen_labels = []
-            idx = -1
-            is_first = True
+            # tokenized_word = [] 
+            # tokenized_labels = []
+            # tokenized_sen_labels = []
+            # idx = -1
+            # is_first = True
 
-            for sen, lab in zip(sentences, labels):
-                idx = -1
-                for word in sen:
-                    idx += 1
-                    tokenized_word = self.tokenizer.tokenize(word)
+            # for sen, lab in zip(sentences, labels):
+            #     idx = -1
+            #     for word in sen:
+            #         idx += 1
+            #         tokenized_word = self.tokenizer.tokenize(word)
 
-                    is_first = True
-                    for token in tokenized_word:
-                        if is_first:
-                            tokenized_sen_labels.append(lab[idx])
-                            is_first = False
-                        else:
-                            tokenized_sen_labels.append(-1)
+            #         is_first = True
+            #         for token in tokenized_word:
+            #             if is_first:
+            #                 tokenized_sen_labels.append(lab[idx])
+            #                 is_first = False
+            #             else:
+            #                 tokenized_sen_labels.append(-1)
 
-                tokenized_labels.append(tokenized_sen_labels)
-                tokenized_sen_labels = []
-            for lab in tokenized_labels:
-                if lab[0] != -1:            
-                    lab.insert(0, -1)
-                    lab.append(-1)
+            #     tokenized_labels.append(tokenized_sen_labels)
+            #     tokenized_sen_labels = []
+            # for lab in tokenized_labels:
+            #     if lab[0] != -1:            
+            #         lab.insert(0, -1)
+            #         lab.append(-1)
 
             # entity_spans, empty = calc_entity_spans(sentences, labels, self.id2val)
-            entity_spans, word_spans = calc_entity_spans(contexts, self.id2val)
-            labels = tokenized_labels
+            all_entities, entities, entity_spans, possible_entity_spans = calc_entity_spans(contexts, self.id2val)
+            
+
+            '''
+            all_entities:
+            batch_size razy all_context_entities:
+                dla kazdej mozliwej encji w all_context_entities:
+                dict(
+                    entity_span=(beg_save, end_save),
+                    entity_label=id2val[text_labels[idx]][2:],
+                    entity_text=entity2
+                ))
+            '''
+            entities = []
+            entity_spans = []
+            entity_labels = []
+            for context in all_entities:
+                context_entities = []
+                context_spans = []
+                context_labels = []
+                for entity in context:
+                    context_entities.append(entity['entity_text'])
+                    context_spans.append(entity['entity_span'])
+                    context_labels.append(self.val2id_entity[entity['entity_label']])
+                entities.append(context_entities)
+                entity_spans.append(context_spans)
+                entity_labels.append(context_labels)
+
+            # labels = tokenized_labels
             # labels = pad_sequences([[l for l in lab] for lab in labels],
             #     maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",
             #     dtype="long", truncating="post")
-            labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=(self.params.max_context_len+2), value=self.params.pad_tag_num, padding="post",
+
+            max_num = max([len(s) for s in entity_labels])
+            #print(max_num)
+            entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
+                maxlen=max_num, value=self.params.pad_tag_num, padding="post",
                 dtype="long", truncating="post")
 
-            texts = [" ".join(sen) for sen in sentences]
+            texts = [" ".join(sen) for sen in sentences]                # zmienic na contexts
 
             # w przypadku braku encji w batch:
             empty = False
             if empty:
                 inputs = self.tokenizer(texts, return_tensors="pt", padding=True)
             else:
-                inputs = self.tokenizer(texts, entity_spans=entity_spans, return_tensors="pt", padding=True)
-
+                inputs = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
+            # print(entity_spans)
+            # print(entities)
             inputs_emb = inputs
+            #print(inputs_emb['input_ids'].shape)
             inputs2 = inputs["input_ids"].long()
             attention_mask2 = inputs["attention_mask"].long()
             if not empty:
@@ -352,10 +388,10 @@ class Model(nn.Module):
                 inputs_emb = inputs_emb.to("cuda")
             outputs = self.embedding(**inputs_emb)
             x = outputs['entity_last_hidden_state']
-            print(x.shape)
-            x = outputs['last_hidden_state']
-            print(x.shape)
-
+            #print(x.shape)
+            # x = outputs['last_hidden_state']
+            # print(x.shape)
+            #quit()
             del inputs
             del attention_mask
             if not empty:
@@ -379,6 +415,20 @@ class Model(nn.Module):
             print("forward: nn_method nie zostala wybrana")
         
 
+        sentence_tensor = x[0:1, :, :]
+        pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.hidden_dim)
+        if self.params.cuda:
+            pad_tensor = pad_tensor.cuda()
+        sentences_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
+
+        for i in range(1, (len(x))):
+            sentence_tensor = x[i:i+1, :, :]
+            pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.hidden_dim)
+            if self.params.cuda:
+                pad_tensor = pad_tensor.cuda()
+            sentence_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
+            sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
+        
         # sentence_tensor = x[0:1, contexts[0]["sentence_beg"]:contexts[0]["sentence_end"], :]
         # pad_tensor = torch.zeros(1, (self.params.max_context_len - len(sentence_tensor[0])), self.params.hidden_dim)
         # if self.params.cuda:
@@ -392,29 +442,16 @@ class Model(nn.Module):
         #         pad_tensor = pad_tensor.cuda()
         #     sentence_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
         #     sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
-        
-        sentence_tensor = x[0:1, contexts[0]["sentence_beg"]:contexts[0]["sentence_end"], :]
-        pad_tensor = torch.zeros(1, (self.params.max_context_len - len(sentence_tensor[0])), self.params.hidden_dim)
-        if self.params.cuda:
-            pad_tensor = pad_tensor.cuda()
-        sentences_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
-
-        for i in range(1, (len(x))):
-            sentence_tensor = x[i:i+1, contexts[i]["sentence_beg"]:contexts[i]["sentence_end"], :]
-            pad_tensor = torch.zeros(1, (self.params.max_context_len - len(sentence_tensor[0])), self.params.hidden_dim)
-            if self.params.cuda:
-                pad_tensor = pad_tensor.cuda()
-            sentence_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
-            sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
 
 
         x = sentences_tensor
+        #print(x.shape)
         x = x.contiguous()
         x = x.view(-1, x.shape[2])
         x = self.dropout(x)
         x = self.fc(x)
 
-        return F.log_softmax(x, dim=1), original_labels#, labels
+        return F.log_softmax(x, dim=1), entity_labels
 
 
 
@@ -496,8 +533,6 @@ def calc_entity_spans(contexts, id2val):
         text = context['context_text']
         text_labels = context['context_labels']
         tmp = [id2val[lab] for lab in text_labels]
-        print(tmp[context['sentence_beg']:context['sentence_end']])
-        print(text[context['sentence_beg']:context['sentence_end']])
         for i in range(context['sentence_beg']):            # przesuniecie beg na poczatek zdania w calym tekscie
             beg += len(text[i])
             end += beg
@@ -571,10 +606,6 @@ def calc_entity_spans(contexts, id2val):
                     (idx, idx+1)
                 )
             beg += len(text[idx])
-        # print(context_entity_spans)
-        # print(context_entity_spans_labels)
-        # print(context_entity_spans_words)
-        # quit()
 
         possible_entity_spans.append(context_possible_entity_spans)
         context_possible_entity_spans = []
@@ -593,4 +624,4 @@ def calc_entity_spans(contexts, id2val):
     #print(all_entities)
     #quit()
 
-    return all_entities, word_spans
+    return all_entities, entity_spans_words, entity_spans, possible_entity_spans
