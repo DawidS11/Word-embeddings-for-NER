@@ -299,8 +299,14 @@ class Model(nn.Module):
                 maxlen=max_num, value=self.params.pad_tag_num, padding="post",
                 dtype="long", truncating="post")
 
-            texts = [" ".join(sen) for sen in sentences]               
+            texts = [" ".join(sen) for sen in sentences]
 
+            # print(entities[1])
+            # quit()
+            # a = 0
+            # for i in range(len(entity_spans)):
+            #     a += len(entity_spans[i])               
+            # print(a)
             # w przypadku braku encji w batch:
             # empty = False
             # if empty:
@@ -428,7 +434,7 @@ def calc_entity_spans(contexts, id2val):
         end_save = -1
         text = context['context_text']
         text_labels = context['context_labels']
-        tmp = [id2val[lab] for lab in text_labels]
+
         for i in range(context['sentence_beg']):            # przesuniecie beg na poczatek zdania w calym tekscie
             beg += len(text[i])
             end += beg
@@ -438,6 +444,7 @@ def calc_entity_spans(contexts, id2val):
             entity = text[idx]
             entity2 = text[idx]
             for idx2 in range(idx, context['sentence_end']):
+                end_save = end
                 end += len(text[idx2])
                 if idx != idx2:
                     entity += " "
@@ -450,21 +457,33 @@ def calc_entity_spans(contexts, id2val):
                             end_save = end
                             entity2 += " "
                             entity2 += text[idx2]
+                            if idx2 == (context['sentence_end'] - 1):                   # I- slowo jest ostatnim w zdaniu
+                                context_entity_spans.append((beg_save, end_save))
+                                context_entity_spans_labels.append(id2val[text_labels[idx]][2:])      # zapisz label bez I/B
+                                context_entity_spans_words.append(entity2)
+                                all_context_entities.append(dict(
+                                    entity_span=(beg_save, end_save),
+                                    entity_label=id2val[text_labels[idx]][2:],
+                                    entity_text=entity2,
+                                ))
+                                added = True
+                                beg_save = -1
+                                end_save = -1
                             
                         elif id2val[text_labels[idx2]][0] == 'B':       
-                            if idx != idx2:                             # encja o dlugosci jednego slowa poprzedzajaca inna encje (inna niz 'O')
-                                if beg_save != -1 and end_save != -1:
-                                    context_entity_spans.append((beg_save, end_save))
-                                    context_entity_spans_labels.append(id2val[text_labels[idx]][2:])      # zapisz label bez I/B
-                                    context_entity_spans_words.append(entity2)
-                                    all_context_entities.append(dict(
-                                        entity_span=(beg_save, end_save),
-                                        entity_label=id2val[text_labels[idx]][2:],
-                                        entity_text=entity2,
-                                    ))
-                                    added = True
-                                    beg_save = -1
-                                    end_save = -1
+                            #if idx != idx2:                             # encja o dlugosci jednego slowa poprzedzajaca inna encje (inna niz 'O')
+                            if beg_save != -1 and end_save != -1:
+                                context_entity_spans.append((beg_save, end_save))
+                                context_entity_spans_labels.append(id2val[text_labels[idx]][2:])      # zapisz label bez I/B
+                                context_entity_spans_words.append(entity2)
+                                all_context_entities.append(dict(
+                                    entity_span=(beg_save, end_save),
+                                    entity_label=id2val[text_labels[idx]][2:],
+                                    entity_text=entity2,
+                                ))
+                                added = True
+                                beg_save = -1
+                                end_save = -1
 
                         elif id2val[text_labels[idx2]][0] == 'O':
                             if beg_save != -1 and end_save != -1:
