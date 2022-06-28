@@ -101,47 +101,55 @@ def train(model, optimizer, criterion, criterion_luke, data_train_iterator, num_
 
         sentences, labels, contexts = next(data_train_iterator)
 
-        # a = 0
-        # num_ent = 0
-        # for i in range(8):
-        #     a += len(labels[i])
-        # print(a)
-        # for i in range(8):
-        #     for j in range(len(labels[i])):
-        #         for k in range(j, len(labels[i])):
-        #             num_ent += 1
         # print(num_ent)
-        if params.we_method.lower() == 'luke':
-            original_labels = labels
-            max_num = max([len(l) for l in original_labels])
+        # if params.we_method.lower() == 'luke':
+        #     original_labels = [contexts[idx]['labels'] for idx in range(len(contexts))]
+        #     max_num = max([len(l) for l in original_labels])
+        #     # original_labels = pad_sequences([[l for l in lab] for lab in original_labels],
+        #     #     maxlen=max_num, value=params.pad_tag_num, padding="post",  
+        #     #     dtype="long", truncating="post")
+        #     # original_labels = torch.LongTensor(original_labels)
+        #     # if params.cuda:
+        #     #     original_labels = original_labels.cuda()
+
+        #     predicted_sequences = []
+        #     for i in range(len(original_labels)):
+        #         predicted_sequence = ["O"] * len(original_labels[i])
+        #         predicted_sequences.append(predicted_sequence)
+
+        outputs, labels = model(sentences, labels, contexts)
+
+        if params.we_method.lower() == 'luke':                      # odczytanie labeli encji
+            out = outputs.data.cpu().numpy()
+            out = np.argmax(out, axis=1)
+            out_len = len(out)                  # 6560
+            print(out_len)
+            original_labels = [contexts[idx]['labels'] for idx in range(len(contexts))]
+            num_entities = int(out_len/len(original_labels))            # liczba encji w batch
+            max_num = 0                                                 # liczba każdej z pary (a, b) 
+            for i in range(num_entities):
+                if (i*i - i*(i-1)/2) == num_entities:
+                    max_num = i
+                    break
+            num = []
+            for j in range(len(original_labels)):
+                for i in range(len(labels[j])):
+                    if (i*i - i*(i-1)/2) == len(labels[j]):
+                        num.append(i)
+                        break
             original_labels = pad_sequences([[l for l in lab] for lab in original_labels],
                 maxlen=max_num, value=params.pad_tag_num, padding="post",  
                 dtype="long", truncating="post")
-            # original_labels = torch.LongTensor(original_labels)
-            # if params.cuda:
-            #     original_labels = original_labels.cuda()
 
             predicted_sequences = []
             for i in range(len(original_labels)):
                 predicted_sequence = ["O"] * len(original_labels[i])
                 predicted_sequences.append(predicted_sequence)
 
-        outputs, labels = model(sentences, labels, contexts)
-
-        labels = torch.LongTensor(labels)
-        if params.cuda:
-            labels = labels.cuda()
-
-        if params.we_method.lower() == 'luke':                      # odczytanie labeli encji
-            sentence_len = len(labels[0])
-            out = outputs.data.cpu().numpy()
-            out = np.argmax(out, axis=1)
-            # chunks = torch.split(out, sentence_len)
-            print(len(out))
             idx = 0
             for i in range(len(original_labels)):
-                for j in range(len(original_labels[i])):
-                    for k in range(j, len(original_labels[i])):
+                for j in range(num[i]):
+                    for k in range(j, num[i]):
                         entity_val = id2val_entity[out[idx]] if out[idx] < 5 else "WRONG"
                         if entity_val == "NIL":
                             idx += 1
@@ -152,13 +160,19 @@ def train(model, optimizer, criterion, criterion_luke, data_train_iterator, num_
                             if k > j:
                                 for l in range(j+1, k+1):
                                     predicted_sequences[i][l] = "I-" + entity_val
+                for j in range(num[i], max_num):
+                    for k in range(j, max_num):
+                        idx += 1
                                 
                         
             print(idx)      # ma byc 6503
             print(predicted_sequences)
             quit()
 
-
+        else:
+            labels = torch.LongTensor(labels)
+            if params.cuda:
+                labels = labels.cuda()
 
         if params.we_method.lower() == 'a':
             loss = criterion_luke(outputs, original_labels, id2val_entity)
