@@ -268,7 +268,7 @@ class Model(nn.Module):
             sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
             #labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
 
-            all_entities = calc_entity_spans(contexts, self.id2val)
+            all_entities = calc_entity_spans(contexts)
             '''
             all_entities:
             batch_size razy all_context_entities:
@@ -294,10 +294,10 @@ class Model(nn.Module):
                 entity_spans.append(context_spans)
                 entity_labels.append(context_labels)
 
-            max_num = max([len(l) for l in entity_labels])
-            entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
-                maxlen=max_num, value=self.params.pad_tag_num, padding="post",
-                dtype="long", truncating="post")
+            # max_num = max([len(l) for l in entity_labels])
+            # entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
+            #     maxlen=max_num, value=self.params.pad_tag_num, padding="post",
+            #     dtype="long", truncating="post")
 
             texts = [" ".join(sen) for sen in sentences]
 
@@ -307,87 +307,40 @@ class Model(nn.Module):
             # for i in range(len(entity_spans)):
             #     a += len(entity_spans[i])               
             # print(a)
-            # w przypadku braku encji w batch:
-            # empty = False
-            # if empty:
-            #     inputs = self.tokenizer(texts, return_tensors="pt", padding=True)
-            # else:
-            #     inputs = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
+            # quit()
 
             inputs_emb = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
-            #print(inputs_emb['input_ids'].shape)
+
+            # inputs = inputs_emb
             # inputs2 = inputs["input_ids"].long()
             # attention_mask2 = inputs["attention_mask"].long()
-            # if not empty:
-            #     entity_attention_mask = inputs["entity_attention_mask"].long()
-            #     entity_ids = inputs["entity_ids"].long()
-            #     entity_position_ids = inputs["entity_position_ids"].long()
+            # entity_attention_mask = inputs["entity_attention_mask"].long()
+            # entity_ids = inputs["entity_ids"].long()
+            # entity_position_ids = inputs["entity_position_ids"].long()
 
-            # inputs = pad_sequences([sen for sen in inputs2],
-            #                     maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
-            # attention_mask = pad_sequences([mask for mask in attention_mask2],
-            #                     maxlen=self.params.max_sen_len, dtype="long", value=0, truncating="post", padding="post")
-            # inputs = pad_sequences([sen for sen in inputs2],
-            #                     maxlen=(self.params.max_context_len+2), dtype="long", truncating="post", padding="post")
-            # attention_mask = pad_sequences([mask for mask in attention_mask2],
-            #                     maxlen=(self.params.max_context_len+2), dtype="long", value=0, truncating="post", padding="post")
-
-            # inputs = torch.LongTensor(inputs)
-            # attention_mask = torch.LongTensor(attention_mask)
-            # if not empty:
-            #     entity_attention_mask = torch.LongTensor(entity_attention_mask)
-            #     entity_ids = torch.LongTensor(entity_ids)
-            #     entity_position_ids = torch.LongTensor(entity_position_ids)
+            # inputs = torch.LongTensor(inputs2)
+            # attention_mask = torch.LongTensor(attention_mask2)
+            # entity_attention_mask = torch.LongTensor(entity_attention_mask)
+            # entity_ids = torch.LongTensor(entity_ids)
+            # entity_position_ids = torch.LongTensor(entity_position_ids)
 
             # if self.params.cuda:
             #     inputs = inputs.cuda()
             #     attention_mask = attention_mask.cuda()
-            #     if not empty:
-            #         entity_attention_mask = entity_attention_mask.cuda()
-            #         entity_ids = entity_ids.cuda()
-            #         entity_position_ids = entity_position_ids.cuda()
+            #     entity_attention_mask = entity_attention_mask.cuda()
+            #     entity_ids = entity_ids.cuda()
+            #     entity_position_ids = entity_position_ids.cuda()
 
-            # if empty:
-            #     outputs = self.embedding(inputs, attention_mask=attention_mask)
-            # else:
-            #     outputs = self.embedding(inputs, attention_mask=attention_mask, entity_attention_mask=entity_attention_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids)
-            # x = outputs[0]
-            # print(outputs)
-            # print("\n===============\n")
+            # outputs = self.embedding(inputs, attention_mask=attention_mask, entity_attention_mask=entity_attention_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids)
+
             if self.params.cuda:
                 inputs_emb = inputs_emb.to("cuda")
             outputs = self.embedding(**inputs_emb)
             del inputs_emb
             x = outputs['entity_last_hidden_state']
-            #print(x.shape)
-            # x = outputs['last_hidden_state']
-            # print(x.shape)
-            #quit()
-            # del inputs
-            # del attention_mask
-            # if not empty:
-            #     del entity_attention_mask
-            #     del entity_ids
-            #     del entity_position_ids
+            print(x)
+            quit()
 
-
-            # sentence_tensor = x[0:1, :, :]
-            # pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.embedding_dim)
-            # if self.params.cuda:
-            #     pad_tensor = pad_tensor.cuda()
-            # sentences_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
-            # del sentence_tensor
-            # del pad_tensor
-            # for i in range(1, (len(x))):
-            #     sentence_tensor = x[i:i+1, :, :]
-            #     pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.embedding_dim)
-            #     if self.params.cuda:
-            #         pad_tensor = pad_tensor.cuda()
-            #     sentence_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
-            #     sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
-            #     del sentence_tensor
-            #     del pad_tensor
-            # x = sentences_tensor
             labels = entity_labels
 
         else:
@@ -411,17 +364,7 @@ class Model(nn.Module):
         return F.log_softmax(x, dim=1), labels
 
 
-def calc_entity_spans(contexts, id2val):
-    possible_entity_spans = []
-    context_possible_entity_spans = []
-    entity_spans = []
-    context_entity_spans = []
-    entity_spans_labels = []
-    context_entity_spans_labels = []
-    entity_spans_words = []
-    context_entity_spans_words = []
-    word_spans = []
-    context_word_spans = []
+def calc_entity_spans(contexts):
 
     all_entities = []
     all_context_entities = []
@@ -430,113 +373,32 @@ def calc_entity_spans(contexts, id2val):
 
         beg = 0
         end = 0
-        beg_save = -1
-        end_save = -1
         text = context['context_text']
-        text_labels = context['context_labels']
 
         for i in range(context['sentence_beg']):            # przesuniecie beg na poczatek zdania w calym tekscie
             beg += len(text[i])
-            end += beg
+            
         for idx in range(context['sentence_beg'], context['sentence_end']):
             end = beg
-            added = False
             entity = text[idx]
-            entity2 = text[idx]
+
             for idx2 in range(idx, context['sentence_end']):
-                end_save = end
                 end += len(text[idx2])
                 if idx != idx2:
                     entity += " "
                     entity += text[idx2]
-                if not added:
-                    if id2val[text_labels[idx]][0] == 'B':
-                        beg_save = beg
-                        
-                        if id2val[text_labels[idx2]][0] == 'I':
-                            end_save = end
-                            entity2 += " "
-                            entity2 += text[idx2]
-                            if idx2 == (context['sentence_end'] - 1):                   # I- slowo jest ostatnim w zdaniu
-                                context_entity_spans.append((beg_save, end_save))
-                                context_entity_spans_labels.append(id2val[text_labels[idx]][2:])      # zapisz label bez I/B
-                                context_entity_spans_words.append(entity2)
-                                all_context_entities.append(dict(
-                                    entity_span=(beg_save, end_save),
-                                    entity_label=id2val[text_labels[idx]][2:],
-                                    entity_text=entity2,
-                                ))
-                                added = True
-                                beg_save = -1
-                                end_save = -1
-                            
-                        elif id2val[text_labels[idx2]][0] == 'B':       
-                            #if idx != idx2:                             # encja o dlugosci jednego slowa poprzedzajaca inna encje (inna niz 'O')
-                            if beg_save != -1 and end_save != -1:
-                                context_entity_spans.append((beg_save, end_save))
-                                context_entity_spans_labels.append(id2val[text_labels[idx]][2:])      # zapisz label bez I/B
-                                context_entity_spans_words.append(entity2)
-                                all_context_entities.append(dict(
-                                    entity_span=(beg_save, end_save),
-                                    entity_label=id2val[text_labels[idx]][2:],
-                                    entity_text=entity2,
-                                ))
-                                added = True
-                                beg_save = -1
-                                end_save = -1
 
-                        elif id2val[text_labels[idx2]][0] == 'O':
-                            if beg_save != -1 and end_save != -1:
-                                context_entity_spans.append((beg_save, end_save))
-                                context_entity_spans_labels.append(id2val[text_labels[idx]][2:])      # zapisz label bez I/B
-                                context_entity_spans_words.append(entity2)
-                                all_context_entities.append(dict(
-                                    entity_span=(beg_save, end_save),
-                                    entity_label=id2val[text_labels[idx]][2:],
-                                    entity_text=entity2,
-                                ))
-                                added = True
-                                beg_save = -1
-                                end_save = -1
-                    
-                    else:
-                        all_context_entities.append(dict(
-                            entity_span=(beg, end),
-                            entity_label="NIL",
-                            entity_text=entity,
-                        ))
+                all_context_entities.append(dict(
+                    entity_span=(beg, end),
+                    entity_label="NIL",                 # NIL, bo nie jest wykorzystywane
+                    entity_text=entity,
+                ))
+
                 
-                else:
-                    all_context_entities.append(dict(
-                        entity_span=(beg, end),
-                        entity_label="NIL",
-                        entity_text=entity,
-                    ))
-
-
-                context_possible_entity_spans.append(
-                    (beg, end)
-                )
-                context_word_spans.append(
-                    (idx, idx+1)
-                )
             beg += len(text[idx])
-
-        possible_entity_spans.append(context_possible_entity_spans)
-        context_possible_entity_spans = []
-        entity_spans.append(context_entity_spans)
-        context_entity_spans = []
-        entity_spans_labels.append(context_entity_spans_labels)
-        context_entity_spans_labels = []
-        entity_spans_words.append(context_entity_spans_words)
-        context_entity_spans_words = []
-        word_spans.append(context_word_spans)
-        context_word_spans = []
 
         all_entities.append(all_context_entities)
         all_context_entities = []
 
-    #print(all_entities)
-    #quit()
 
     return all_entities
