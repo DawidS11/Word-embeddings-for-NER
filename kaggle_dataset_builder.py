@@ -77,9 +77,9 @@ class KaggleDataset(object):
         self.val2id_entity = {t: i for i, t in enumerate(tags_vals_entity)}
         self.id2val_entity = {i: t for i, t in enumerate(tags_vals_entity)}
 
-        self.train_contexts = get_context_kaggle(self.train_sentences, self.train_labels)
-        self.val_contexts = get_context_kaggle(self.val_sentences, self.val_labels)
-        self.test_contexts = get_context_kaggle(self.test_sentences, self.test_labels)
+        self.train_contexts = get_context_kaggle(self.train_sentences, self.train_labels, self.val2id)
+        self.val_contexts = get_context_kaggle(self.val_sentences, self.val_labels, self.val2id)
+        self.test_contexts = get_context_kaggle(self.test_sentences, self.test_labels, self.val2id)
 
         params.num_of_tags = len(self.val2id)
         params.num_of_tags_entity = len(self.val2id_entity)

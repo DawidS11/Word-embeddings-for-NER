@@ -1,18 +1,19 @@
 from transformers import BertTokenizer, RobertaTokenizer, LukeTokenizer
 
 
-def get_context_kaggle(sentences, labels):
+def get_context_kaggle(sentences, labels, val2id):
 
     contexts = []
     for sen, lab in zip(sentences, labels):
-        sen_str = " ".join(sen)
+        sentence = " ".join(sen)
+        labels = [val2id[l] for l in lab]
         contexts.append(dict(
             sentence=sen,
-            labels=lab,
+            labels=labels,
             context_text=sen,
-            context_labels=lab,
+            context_labels=labels,
             sentence_beg=0,
-            sentence_end=len(sen_str),
+            sentence_end=len(sentence),
         ))
     return contexts
 
@@ -40,9 +41,10 @@ def get_context_conll2003(documents, params, val2id):
         for sen, lab in zip(document["sentences"], document["sentences_labels"]):
             lab = [val2id[l] for l in lab]
             sentence_end += len(sen)
-            
+            if not sen:
+                continue
             if total_subword_length <= params.max_context_len:
-                if sentence_beg != sentence_end:
+                if sentence_beg < sentence_end:
                     contexts.append(dict(
                         sentence=sen,
                         labels=lab,
@@ -69,7 +71,7 @@ def get_context_conll2003(documents, params, val2id):
                             context_end += 1
                         else:
                             break
-                if context_beg != context_end:
+                if context_beg < context_end:
                     contexts.append(dict(
                         sentence=sen,
                         labels=lab,

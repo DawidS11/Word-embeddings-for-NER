@@ -41,6 +41,7 @@ def load_documents(dataset_file):
     with open(dataset_file) as f:
         for line in f:
             line = line.rstrip()
+            
             if line.startswith("-DOCSTART"):
                 if sentences:
                     documents.append(dict(
@@ -49,6 +50,8 @@ def load_documents(dataset_file):
                     ))
                     sentences = []
                     sentences_labels = []
+                    words = []
+                    labels = []
 
                 continue
 
@@ -62,8 +65,8 @@ def load_documents(dataset_file):
                 items = line.split(" ")
                 words.append(items[0])
                 labels.append(items[-1])
-
-    if words:
+            
+    if sentences:
         documents.append(dict(
             sentences=sentences,
             sentences_labels=sentences_labels,

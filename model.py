@@ -3,12 +3,11 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import gc
 
+from allennlp.modules.elmo import Elmo, batch_to_ids
 from transformers import BertTokenizer, BertModel
 from transformers import RobertaTokenizer, RobertaModel
 from transformers import LukeTokenizer, LukeModel
-from allennlp.modules.elmo import Elmo, batch_to_ids
 
 from keras.preprocessing.sequence import pad_sequences
 
@@ -95,8 +94,7 @@ class Model(nn.Module):
         
         if self.we_method == "glove":
             sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
-            labels_vals = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
-            labels = [[self.val2id[l] for l in lab] for lab in labels_vals]
+            labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
             max_num = max([len(s) for s in sentences])
 
             max_len = max(map(lambda x: len(x), sentences))#, default=0)                                                                          # DEFAULT
@@ -120,8 +118,7 @@ class Model(nn.Module):
         
         elif self.we_method == 'elmo':
             sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
-            labels_vals = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
-            labels = [[self.val2id[l] for l in lab] for lab in labels_vals]
+            labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
             max_num = max([len(s) for s in sentences])
 
             sentences_padded = []
@@ -148,7 +145,9 @@ class Model(nn.Module):
 
 
         elif self.we_method == 'bert':
-
+            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+            
             tokenized_sentences = []
             tokenized_sen = []
             tokenized_word = []
@@ -185,32 +184,29 @@ class Model(nn.Module):
                     lab.append(self.params.pad_tag_num)
 
             labels = tokenized_labels
-            # labels = pad_sequences([[l for l in lab] for lab in labels],
-            #     maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",  
-            #     dtype="long", truncating="post")
+            max_num = max([len(l) for l in labels])
             labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=(self.params.max_context_len+2), value=self.params.pad_tag_num, padding="post",  
+                maxlen=max_num, value=self.params.pad_tag_num, padding="post",  
                 dtype="long", truncating="post")
             
-            
-            mask = (labels >= 0)
-            mask = torch.FloatTensor(mask)
+            attention_mask = (labels >= 0)
+            attention_mask = torch.FloatTensor(attention_mask)
             if self.params.cuda:
-                mask = mask.cuda()
+                attention_mask = attention_mask.cuda()
 
-            # inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
-            #                 maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
             inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
-                            maxlen=(self.params.max_context_len+2), dtype="long", truncating="post", padding="post")
+                            maxlen=max_num, dtype="long", truncating="post", padding="post")
 
             inputs = torch.LongTensor(inputs)
             if self.params.cuda:
                 inputs = inputs.cuda()
             
-            x = self.embedding(inputs, attention_mask = mask)[0]
+            x = self.embedding(inputs, attention_mask=attention_mask)[0]
             
 
         elif self.we_method == 'roberta':
+            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
 
             tokenized_sentences = []
             tokenized_sen = []
@@ -241,34 +237,37 @@ class Model(nn.Module):
                 tokenized_sen = []
                 tokenized_sen_labels = []
             for sen, lab in zip(tokenized_sentences, tokenized_labels):
-                if sen[0] != "[CLS]":
-                    sen.insert(0, "[CLS]")
-                    sen.append("[SEP]")
+                if sen[0] != "<s>":
+                    sen.insert(0, "<s>")
+                    sen.append("</s>")
                     lab.insert(0, self.params.pad_tag_num)
                     lab.append(self.params.pad_tag_num)
 
             labels = tokenized_labels
+            max_num = max([len(l) for l in labels])
             labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=self.params.max_sen_len, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
+                maxlen=max_num, value=self.params.pad_tag_num, padding="post",       
                 dtype="long", truncating="post")
 
-            mask = (labels >= 0)
-            mask = torch.FloatTensor(mask)
+            attention_mask = (labels >= 0)
+            attention_mask = torch.FloatTensor(attention_mask)
             if self.params.cuda:
-                mask = mask.cuda()
+                attention_mask = attention_mask.cuda()
 
             inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
-                          maxlen=self.params.max_sen_len, dtype="long", truncating="post", padding="post")
+                          maxlen=max_num, dtype="long", truncating="post", padding="post")
 
             inputs = torch.LongTensor(inputs)
             if self.params.cuda:
                 inputs = inputs.cuda()
 
-            x = self.embedding(inputs, attention_mask = mask)[0]
+            x = self.embedding(inputs, attention_mask=attention_mask)[0]
 
 
         elif self.we_method == 'luke':
-            
+            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            #labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+
             all_entities = calc_entity_spans(contexts, self.id2val)
             '''
             all_entities:
@@ -295,12 +294,12 @@ class Model(nn.Module):
                 entity_spans.append(context_spans)
                 entity_labels.append(context_labels)
 
-            max_num = max([len(s) for s in entity_labels])
+            max_num = max([len(l) for l in entity_labels])
             entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
                 maxlen=max_num, value=self.params.pad_tag_num, padding="post",
                 dtype="long", truncating="post")
 
-            texts = [" ".join(sen) for sen in sentences]                # zmienic na contexts
+            texts = [" ".join(sen) for sen in sentences]               
 
             # w przypadku braku encji w batch:
             # empty = False
@@ -364,8 +363,26 @@ class Model(nn.Module):
             #     del entity_attention_mask
             #     del entity_ids
             #     del entity_position_ids
-            # gc.collect()
-            # torch.cuda.empty_cache()
+
+
+            # sentence_tensor = x[0:1, :, :]
+            # pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.embedding_dim)
+            # if self.params.cuda:
+            #     pad_tensor = pad_tensor.cuda()
+            # sentences_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
+            # del sentence_tensor
+            # del pad_tensor
+            # for i in range(1, (len(x))):
+            #     sentence_tensor = x[i:i+1, :, :]
+            #     pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.embedding_dim)
+            #     if self.params.cuda:
+            #         pad_tensor = pad_tensor.cuda()
+            #     sentence_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
+            #     sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
+            #     del sentence_tensor
+            #     del pad_tensor
+            # x = sentences_tensor
+            labels = entity_labels
 
         else:
             print("forward: we_method nie zostala wybrana. ")
@@ -379,43 +396,7 @@ class Model(nn.Module):
 
         else:
             print("forward: nn_method nie zostala wybrana")
-        
-        if self.we_method == 'luke':
-            sentence_tensor = x[0:1, :, :]
-            pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.hidden_dim)
-            if self.params.cuda:
-                pad_tensor = pad_tensor.cuda()
-            sentences_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
-            del sentence_tensor
-            del pad_tensor
-            for i in range(1, (len(x))):
-                sentence_tensor = x[i:i+1, :, :]
-                pad_tensor = torch.zeros(1, (max_num - len(sentence_tensor[0])), self.params.hidden_dim)
-                if self.params.cuda:
-                    pad_tensor = pad_tensor.cuda()
-                sentence_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
-                sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
-                del sentence_tensor
-                del pad_tensor
-        
-        # sentence_tensor = x[0:1, contexts[0]["sentence_beg"]:contexts[0]["sentence_end"], :]
-        # pad_tensor = torch.zeros(1, (self.params.max_context_len - len(sentence_tensor[0])), self.params.hidden_dim)
-        # if self.params.cuda:
-        #     pad_tensor = pad_tensor.cuda()
-        # sentences_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
 
-        # for i in range(1, (len(x))):
-        #     sentence_tensor = x[i:i+1, contexts[i]["sentence_beg"]:contexts[i]["sentence_end"], :]
-        #     pad_tensor = torch.zeros(1, (self.params.max_context_len - len(sentence_tensor[0])), self.params.hidden_dim)
-        #     if self.params.cuda:
-        #         pad_tensor = pad_tensor.cuda()
-        #     sentence_tensor = torch.cat((sentence_tensor, pad_tensor), 1)
-        #     sentences_tensor = torch.cat((sentences_tensor, sentence_tensor), 0)
-
-
-            x = sentences_tensor
-            labels = entity_labels
-        #print(x.shape)
         x = x.contiguous()
         x = x.view(-1, x.shape[2])
         x = self.dropout(x)
@@ -479,7 +460,7 @@ def calc_entity_spans(contexts, id2val):
                                     all_context_entities.append(dict(
                                         entity_span=(beg_save, end_save),
                                         entity_label=id2val[text_labels[idx]][2:],
-                                        entity_text=entity2
+                                        entity_text=entity2,
                                     ))
                                     added = True
                                     beg_save = -1
@@ -493,7 +474,7 @@ def calc_entity_spans(contexts, id2val):
                                 all_context_entities.append(dict(
                                     entity_span=(beg_save, end_save),
                                     entity_label=id2val[text_labels[idx]][2:],
-                                    entity_text=entity2
+                                    entity_text=entity2,
                                 ))
                                 added = True
                                 beg_save = -1
@@ -503,14 +484,14 @@ def calc_entity_spans(contexts, id2val):
                         all_context_entities.append(dict(
                             entity_span=(beg, end),
                             entity_label="NIL",
-                            entity_text=entity
+                            entity_text=entity,
                         ))
                 
                 else:
                     all_context_entities.append(dict(
                         entity_span=(beg, end),
                         entity_label="NIL",
-                        entity_text=entity
+                        entity_text=entity,
                     ))
 
 

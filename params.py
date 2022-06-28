@@ -6,9 +6,9 @@ class Params():
         self.val_dataset_size = 0.15
         self.test_dataset_size = 0.15       
 
-        self.wb_method = 'bert' # glove / elmo / bert / roberta / luke
+        self.we_method = 'luke' # glove / elmo / bert / roberta / luke
         self.nn_method = 'lstm' # rnn / lstm / cnn
-        self.dataset_name = 'kaggle' # kaggle / conll2003
+        self.dataset_name = 'conll2003' # kaggle / conll2003
 
         self.cuda = False    
         self.seed = 2022  
@@ -24,10 +24,10 @@ class Params():
         self.glove_dim = 300
         self.elmo_dim = 512
         self.bert_dim = 768 
-        self.roberta_dim = 1024       
-        self.luke_dim = 1024                 
+        self.roberta_dim = 768       
+        self.luke_dim = 768                 
 
-        self.data_dir = 'data/kaggle/' # 'data/kaggle/' 'data/conll2003/'
+        self.data_dir = 'data/conll2003/' # 'data/kaggle/' 'data/conll2003/'
         self.glove_dir = 'data/glove/'  
         self.elmo_dir = 'data/elmo/'
         # self.data_dir = '/content/'  
@@ -42,9 +42,11 @@ class Params():
         self.test_size = 0
         self.num_of_tags  = 0
         self.max_sen_len = 0
+        self.max_entity_num = 0
         self.vocab_size = 0
 
-        self.pad_word = 'PAD'
+        self.max_context_len = 400
+        self.pad_word = 'P'
         self.pad_tag = 'O'
         self.pad_tag_num = -1
         self.unk_word = 'UNK'
