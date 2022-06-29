@@ -269,16 +269,7 @@ class Model(nn.Module):
             #labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
 
             all_entities = calc_entity_spans(contexts)
-            '''
-            all_entities:
-            batch_size razy all_context_entities:
-                dla kazdej mozliwej encji w all_context_entities:
-                dict(
-                    entity_span=(beg_save, end_save),
-                    entity_label=id2val[text_labels[idx]][2:],
-                    entity_text=entity2
-                ))
-            '''
+
             entities = []
             entity_spans = []
             entity_labels = []
@@ -300,14 +291,6 @@ class Model(nn.Module):
             #     dtype="long", truncating="post")
 
             texts = [" ".join(sen) for sen in sentences]
-
-            # print(entities[1])
-            # quit()
-            # a = 0
-            # for i in range(len(entity_spans)):
-            #     a += len(entity_spans[i])               
-            # print(a)
-            # quit()
 
             inputs_emb = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
 
@@ -338,8 +321,6 @@ class Model(nn.Module):
             outputs = self.embedding(**inputs_emb)
             del inputs_emb
             x = outputs['entity_last_hidden_state']
-            print(x)
-            quit()
 
             labels = entity_labels
 

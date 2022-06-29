@@ -11,25 +11,16 @@ from keras.preprocessing.sequence import pad_sequences
 
 import params
 
-def loss_fun_luke(outputs, labels, id2val_entity):
-    pass
 
-
-def accuracy_luke(outputs, labels, id2val_entity, val2id):
+def accuracy_luke(outputs, labels):
 
     labels = labels.ravel()         # (1D: batch_size*seq_len)
 
     mask = (labels >= 0)
 
-    outputs = np.argmax(outputs, axis=1)
-    outputs = [id2val_entity[l] if l < 5 else "WRONG" for l in outputs]
+    outputs = np.array(outputs)
 
-    
-    if float(np.sum(mask)) > 0.0:
-        acc = np.sum(outputs == labels)/float(np.sum(mask)) 
-    else:
-        acc = 0
-    return acc
+    return np.sum(outputs == labels)/float(np.sum(mask)) 
 
 
 def loss_fun(outputs, labels):
@@ -53,14 +44,10 @@ def accuracy(outputs, labels):
 
     outputs = np.argmax(outputs, axis=1)
 
-    if float(np.sum(mask)) > 0.0:
-        acc = np.sum(outputs == labels)/float(np.sum(mask)) 
-    else:
-        acc = 0
-    return acc
+    return np.sum(outputs == labels)/float(np.sum(mask)) 
 
 
-def evaluate(model, criterion, criterion_luke, data_eval_iterator, num_batches, params, id2val_entity):
+def evaluate(model, criterion, data_eval_iterator, num_batches, params, id2val_entity):
      
     model.eval()
     total_loss = 0.0
@@ -73,11 +60,84 @@ def evaluate(model, criterion, criterion_luke, data_eval_iterator, num_batches, 
 
             outputs, labels = model(sentences, labels, contexts)
 
+            if params.we_method.lower() == 'luke':                      # odczytanie labeli encji
+                entity_outputs = outputs
+                entity_labels = labels
+                out = outputs
+                out = out.data.cpu().numpy()
+                out = np.argmax(out, axis=1)
+                out_len = len(out)               
+
+                original_labels = [contexts[idx]['labels'] for idx in range(len(contexts))]
+                num_entities = int(out_len/len(original_labels))            # liczba encji w batch
+                max_num = 0                                                 # liczba każdej z pary (a, b) 
+                for i in range(num_entities):
+                    if (i*i - i*(i-1)/2) == num_entities:
+                        max_num = i
+                        break
+                num = []
+                for j in range(len(original_labels)):
+                    for i in range(len(labels[j])):
+                        if (i*i - i*(i-1)/2) == len(labels[j]):
+                            num.append(int(i))
+                            break
+                        elif len(labels[j]) == 1:
+                            num.append(1)
+                original_labels = pad_sequences([[l for l in lab] for lab in original_labels],
+                    maxlen=max_num, value=params.pad_tag_num, padding="post",  
+                    dtype="long", truncating="post")
+
+                luke_labels = [[params.num_of_tags for i in range(max_num)] for j in range(len(original_labels))]
+
+                predicted_sequences = []
+                for i in range(len(original_labels)):
+                    predicted_sequence = ["O"] * len(original_labels[i])
+                    predicted_sequences.append(predicted_sequence)
+
+                idx = 0
+                for i in range(len(original_labels)):
+                    for j in range(max_num):
+                        for k in range(j, max_num):
+                            if j < num[i] and k < num[i]:
+                                entity_val = id2val_entity[out[idx]] if out[idx] < 5 else "NIL"
+
+                                if entity_val == "NIL":
+                                    idx += 1
+                                    continue
+                                else:
+                                    idx += 1
+                                    predicted_sequences[i][j] = "B-" + entity_val
+                                    if k > j:
+                                        for l in range(j+1, k+1):
+                                            predicted_sequences[i][l] = "I-" + entity_val
+                            else:
+                                idx += 1
+                    for j in range(len(original_labels[i])):
+                        if original_labels[i][j] != params.pad_tag_num:
+                            luke_labels[i][j] = val2id[predicted_sequences[i][j]]
+
+                luke_labels = torch.LongTensor(luke_labels)
+                if params.cuda:
+                    luke_labels = luke_labels.cuda()
+
+                outputs = luke_labels.ravel()
+                labels = original_labels
+
             labels = torch.LongTensor(labels)
             if params.cuda:
                 labels = labels.cuda()
 
-            loss = criterion(outputs, labels)
+            if params.we_method.lower() == 'luke':
+                max_num = max([len(l) for l in entity_labels])
+                entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
+                    maxlen=max_num, value=params.pad_tag_num, padding="post",
+                    dtype="long", truncating="post")
+                entity_labels = torch.LongTensor(entity_labels)
+                if params.cuda:
+                    entity_labels = entity_labels.cuda()
+                loss = criterion(entity_outputs, entity_labels)
+            else:
+                loss = criterion(outputs, labels)
 
             outputs = outputs.data.cpu().numpy()
             labels = labels.data.cpu().numpy()
@@ -90,7 +150,7 @@ def evaluate(model, criterion, criterion_luke, data_eval_iterator, num_batches, 
     return avg_loss, avg_acc
 
 
-def train(model, optimizer, criterion, criterion_luke, data_train_iterator, num_batches, params, id2val_entity, val2id):
+def train(model, optimizer, criterion, data_train_iterator, num_batches, params, id2val_entity, val2id):
 
     model.train()
     total_loss = 0.0
@@ -101,29 +161,16 @@ def train(model, optimizer, criterion, criterion_luke, data_train_iterator, num_
 
         sentences, labels, contexts = next(data_train_iterator)
 
-        # print(num_ent)
-        # if params.we_method.lower() == 'luke':
-        #     original_labels = [contexts[idx]['labels'] for idx in range(len(contexts))]
-        #     max_num = max([len(l) for l in original_labels])
-        #     # original_labels = pad_sequences([[l for l in lab] for lab in original_labels],
-        #     #     maxlen=max_num, value=params.pad_tag_num, padding="post",  
-        #     #     dtype="long", truncating="post")
-        #     # original_labels = torch.LongTensor(original_labels)
-        #     # if params.cuda:
-        #     #     original_labels = original_labels.cuda()
-
-        #     predicted_sequences = []
-        #     for i in range(len(original_labels)):
-        #         predicted_sequence = ["O"] * len(original_labels[i])
-        #         predicted_sequences.append(predicted_sequence)
-
         outputs, labels = model(sentences, labels, contexts)
 
         if params.we_method.lower() == 'luke':                      # odczytanie labeli encji
-            out = outputs.data.cpu().numpy()
+            entity_outputs = outputs
+            entity_labels = labels
+            out = outputs
+            out = out.data.cpu().numpy()
             out = np.argmax(out, axis=1)
-            out_len = len(out)                  # 6560
-            print(out_len)
+            out_len = len(out)               
+
             original_labels = [contexts[idx]['labels'] for idx in range(len(contexts))]
             num_entities = int(out_len/len(original_labels))            # liczba encji w batch
             max_num = 0                                                 # liczba każdej z pary (a, b) 
@@ -135,11 +182,15 @@ def train(model, optimizer, criterion, criterion_luke, data_train_iterator, num_
             for j in range(len(original_labels)):
                 for i in range(len(labels[j])):
                     if (i*i - i*(i-1)/2) == len(labels[j]):
-                        num.append(i)
+                        num.append(int(i))
                         break
+                    elif len(labels[j]) == 1:
+                        num.append(1)
             original_labels = pad_sequences([[l for l in lab] for lab in original_labels],
                 maxlen=max_num, value=params.pad_tag_num, padding="post",  
                 dtype="long", truncating="post")
+
+            luke_labels = [[params.num_of_tags for i in range(max_num)] for j in range(len(original_labels))]
 
             predicted_sequences = []
             for i in range(len(original_labels)):
@@ -148,34 +199,46 @@ def train(model, optimizer, criterion, criterion_luke, data_train_iterator, num_
 
             idx = 0
             for i in range(len(original_labels)):
-                for j in range(num[i]):
-                    for k in range(j, num[i]):
-                        entity_val = id2val_entity[out[idx]] if out[idx] < 5 else "WRONG"
-                        if entity_val == "NIL":
-                            idx += 1
-                            continue
+                for j in range(max_num):
+                    for k in range(j, max_num):
+                        if j < num[i] and k < num[i]:
+                            entity_val = id2val_entity[out[idx]] if out[idx] < 5 else "NIL"
+
+                            if entity_val == "NIL":
+                                idx += 1
+                                continue
+                            else:
+                                idx += 1
+                                predicted_sequences[i][j] = "B-" + entity_val
+                                if k > j:
+                                    for l in range(j+1, k+1):
+                                        predicted_sequences[i][l] = "I-" + entity_val
                         else:
                             idx += 1
-                            predicted_sequences[i][j] = "B-" + entity_val
-                            if k > j:
-                                for l in range(j+1, k+1):
-                                    predicted_sequences[i][l] = "I-" + entity_val
-                for j in range(num[i], max_num):
-                    for k in range(j, max_num):
-                        idx += 1
-                                
-                        
-            print(idx)      # ma byc 6503
-            print(predicted_sequences)
-            quit()
+                for j in range(len(original_labels[i])):
+                    if original_labels[i][j] != params.pad_tag_num:
+                        luke_labels[i][j] = val2id[predicted_sequences[i][j]]
 
-        else:
-            labels = torch.LongTensor(labels)
+            luke_labels = torch.LongTensor(luke_labels)
             if params.cuda:
-                labels = labels.cuda()
+                luke_labels = luke_labels.cuda()
 
-        if params.we_method.lower() == 'a':
-            loss = criterion_luke(outputs, original_labels, id2val_entity)
+            outputs = luke_labels.ravel()
+            labels = original_labels
+
+        labels = torch.LongTensor(labels)
+        if params.cuda:
+            labels = labels.cuda()
+
+        if params.we_method.lower() == 'luke':
+            max_num = max([len(l) for l in entity_labels])
+            entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
+                maxlen=max_num, value=params.pad_tag_num, padding="post",
+                dtype="long", truncating="post")
+            entity_labels = torch.LongTensor(entity_labels)
+            if params.cuda:
+                entity_labels = entity_labels.cuda()
+            loss = criterion(entity_outputs, entity_labels)
         else:
             loss = criterion(outputs, labels)
 
@@ -188,7 +251,10 @@ def train(model, optimizer, criterion, criterion_luke, data_train_iterator, num_
         labels = labels.data.cpu().numpy()
 
         total_loss += loss.item()
-        total_acc += accuracy_luke(outputs, labels, id2val_entity, val2id)
+        if params.we_method.lower() == 'luke':
+            total_acc += accuracy_luke(outputs, labels)
+        else:
+            total_acc += accuracy(outputs, labels)
 
         batches.set_postfix(accuracy='{:05.3f}'.format(total_acc/(batch+1)), loss='{:05.3f}'.format(total_loss/(batch+1)))
 
@@ -220,9 +286,7 @@ if __name__ == '__main__':
     model = Model(params, id2val, val2id, val2id_entity).cuda() if params.cuda else Model(params, id2val, val2id, val2id_entity)
     optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
  
-    criterion = loss_fun
-    criterion_luke = loss_fun_luke
-    
+    criterion = loss_fun    
 
     print("\n\nTraining...")
     best_acc = -1.0
@@ -237,7 +301,7 @@ if __name__ == '__main__':
         # Training:
         num_batches = (params.train_size + 1) // params.train_batch_size           # number of batches in one epoch
         data_train_iterator = dataset_loader.data_iterator(data_train, params.train_size, params.train_batch_size, params, shuffle=False)
-        avg_loss, avg_acc = train(model, optimizer, criterion, criterion_luke, data_train_iterator, num_batches, params, id2val_entity, val2id)
+        avg_loss, avg_acc = train(model, optimizer, criterion, data_train_iterator, num_batches, params, id2val_entity, val2id)
 
         end_train_time = time.time()
         train_time = end_train_time - start_train_time
@@ -249,7 +313,7 @@ if __name__ == '__main__':
         # Validation:
         num_batches = (params.val_size + 1) // params.val_batch_size
         data_val_iterator = dataset_loader.data_iterator(data_val, params.val_size, params.val_batch_size, params, shuffle=False)
-        avg_loss, avg_acc = evaluate(model, criterion, criterion_luke, data_val_iterator, num_batches, params, id2val_entity)
+        avg_loss, avg_acc = evaluate(model, criterion, data_val_iterator, num_batches, params, id2val_entity)
 
         end_val_time = time.time()
         val_time = end_val_time - end_train_time
@@ -272,7 +336,7 @@ if __name__ == '__main__':
     start_test_time = time.time()
     num_batches = (params.test_size + 1) // params.val_batch_size
     data_test_iterator = dataset_loader.data_iterator(data_test, params.test_size, params.val_batch_size, params, shuffle=False)
-    avg_loss, avg_acc = evaluate(model, criterion, criterion_luke, data_test_iterator, num_batches, params, id2val_entity)
+    avg_loss, avg_acc = evaluate(model, criterion, data_test_iterator, num_batches, params, id2val_entity)
     end_test_time = time.time()
     test_time = start_test_time - end_test_time
     total_time += test_time

@@ -1,5 +1,8 @@
 from transformers import BertTokenizer, RobertaTokenizer, LukeTokenizer
 
+'''
+Dla kazdego zdania przypisywany jest kontekst. W przypadku kaggle, jest to tylko to zdanie, w przypadku conll2003 jest to maksymalnie dokument, w ktorym zdanie sie znajduje.
+'''
 
 def get_context_kaggle(sentences, labels, val2id):
 
@@ -77,7 +80,7 @@ def get_context_conll2003(documents, params, val2id):
                         labels=lab,
                         context_text=sentences_flat[context_beg:context_end],
                         context_labels=text_labels[context_beg:context_end],
-                        sentence_beg=sentence_beg-context_beg,
+                        sentence_beg=sentence_beg-context_beg,                  # -context_beg zeby wskazac poczatek zdania w context_text
                         sentence_end=sentence_end-context_beg,
                     ))
 
