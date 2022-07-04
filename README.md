@@ -13,5 +13,7 @@ Conll-2003: https://www.kaggle.com/datasets/alaakhaled/conll003-englishversion
 
 Kaggle dataset: https://www.kaggle.com/datasets/abhinavwalia95/entity-annotated-corpus
 
-
+-
+-
+-
 Comments are currently in Polish. 
