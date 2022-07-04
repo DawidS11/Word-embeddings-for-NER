@@ -1,9 +1,17 @@
 # Word-embeddings-for-NER
-Program sprawdzający wpływ wektorów zanurzeń w zadaniu wykrywania jednostek nazewniczych (NER). 
 
-Pliki GloVe: https://nlp.stanford.edu/projects/glove/ (glove.6B.zip)
+*In progress*
 
-Pliki ELMo: https://drive.google.com/file/d/1jklcip5p4I4wML5w0HDmvzWTvGY5cInG/view?usp=sharing
+A program comparing the influence of word and entity vectors in a Named Entity Recognition (NER) task.
+Models for embeddings in use: GloVe, ELMo, BERT, RoBERTa, LUKE.
+
+GloVe's files: https://nlp.stanford.edu/projects/glove/ (glove.6B.zip)
+
+ELMo's files: https://drive.google.com/file/d/1jklcip5p4I4wML5w0HDmvzWTvGY5cInG/view?usp=sharing
 
 Conll-2003: https://www.kaggle.com/datasets/alaakhaled/conll003-englishversion
 
+Kaggle dataset: https://www.kaggle.com/datasets/abhinavwalia95/entity-annotated-corpus
+
+
+Comments are currently in Polish. 
