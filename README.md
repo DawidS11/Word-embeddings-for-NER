@@ -4,7 +4,7 @@
 
 *Comments are currently in Polish.*
 
-A program comparing the influence of word and entity vectors in a Named Entity Recognition (NER) task.
+A program comparing the impact of word and entity embeddings in a Named Entity Recognition (NER) task.
 Models for embeddings in use: GloVe, ELMo, BERT, RoBERTa, LUKE.
 
 GloVe's files: https://nlp.stanford.edu/projects/glove/ (glove.6B.zip)
