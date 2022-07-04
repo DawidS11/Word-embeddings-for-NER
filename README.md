@@ -1,6 +1,6 @@
 # Word-embeddings-for-NER
 
-*(In progress) Comments are currently in Polish. *
+*(In progress) Comments are currently in Polish.*
 
 A program comparing the influence of word and entity vectors in a Named Entity Recognition (NER) task.
 Models for embeddings in use: GloVe, ELMo, BERT, RoBERTa, LUKE.
