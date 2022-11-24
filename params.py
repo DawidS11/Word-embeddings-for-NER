@@ -6,17 +6,17 @@ class Params():
         self.val_dataset_size = 0.15
         self.test_dataset_size = 0.15       
 
-        self.we_method = 'luke' # glove / elmo / bert / roberta / luke
-        self.nn_method = 'lstm' # rnn / lstm / cnn
+        self.we_method = 'elmo' # glove / elmo / bert / roberta / luke
+        self.nn_method = 'rnn' # rnn / lstm / cnn
         self.dataset_name = 'conll2003' # kaggle / conll2003
 
-        self.cuda = False    
+        self.device = 'cpu' 
         self.seed = 2022  
 
         self.num_epochs = 5
         self.learning_rate = 1e-3
-        self.train_batch_size = 8
-        self.val_batch_size = 4
+        self.train_batch_size = 64
+        self.val_batch_size = 64
         self.dropout = 0.3
 
         self.embedding_dim = 100     
@@ -27,12 +27,12 @@ class Params():
         self.roberta_dim = 768       
         self.luke_dim = 768                 
 
-        self.data_dir = 'data/conll2003/' # 'data/kaggle/' 'data/conll2003/'
-        self.glove_dir = 'data/glove/'  
-        self.elmo_dir = 'data/elmo/'
-        # self.data_dir = '/content/'  
-        # self.glove_dir = '/content/' 
-        # self.elmo_dir = '/content/' 
+        # self.data_dir = 'data/conll2003/' # 'data/kaggle/' 'data/conll2003/'
+        # self.glove_dir = 'data/glove/'  
+        # self.elmo_dir = 'data/elmo/'
+        self.data_dir = '/content/'  
+        self.glove_dir = '/content/' 
+        self.elmo_dir = '/content/' 
 
         self.elmo_options_file = "elmo_2x2048_256_2048cnn_1xhighway_options.json"
         self.elmo_weight_file = "elmo_2x2048_256_2048cnn_1xhighway_weights.hdf5"
@@ -50,3 +50,6 @@ class Params():
         self.pad_tag = 'O'
         self.pad_tag_num = -1
         self.unk_word = 'UNK'
+
+    def get_device(self):
+        return self.device

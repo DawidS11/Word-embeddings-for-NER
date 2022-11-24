@@ -1,3 +1,7 @@
+import os
+
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
 import numpy as np
 import torch
 import torch.optim as optim
@@ -7,8 +11,8 @@ import time
 
 from model import Model
 from dataset_loader import DatasetLoader
-from keras.preprocessing.sequence import pad_sequences
-
+from keras_preprocessing.sequence import pad_sequences
+from sklearn.metrics import f1_score
 import params
 
 
@@ -28,30 +32,50 @@ def loss_fun(outputs, labels):
     labels = labels.ravel()         # (1D: batch_size*seq_len)
 
     mask = (labels >= 0).float()
-
-    labels = labels % outputs.shape[1]
-
+    
+    #labels = labels % outputs.shape[1]     # nie dziala z device="mps"
+    labels2 = []
+    for l in labels:
+        labels2.append(l.item() % outputs.shape[1])
+    labels = torch.LongTensor(labels2)
+    labels = labels.to(device=params.get_device())
+    
     num_tokens = int(torch.sum(mask))
-
+    
     return -torch.sum(outputs[range(outputs.shape[0]), labels]*mask)/num_tokens
 
 
 def accuracy(outputs, labels):
 
     labels = labels.ravel()         # (1D: batch_size*seq_len)
-
     mask = (labels >= 0)
-
     outputs = np.argmax(outputs, axis=1)
-
+    
     return np.sum(outputs == labels)/float(np.sum(mask)) 
 
 
+def f1(outputs, labels): 
+    #sklearn.metrics.f1_score(labels, outputs, average='micro')
+
+    labels = labels.ravel()
+    mask = (labels >= 0)
+    outputs = np.argmax(outputs, axis=1)
+    labels2 = []
+    outputs2 = []
+    for i in range(len(mask)):
+        if mask[i]:
+            labels2.append(labels[i])
+            outputs2.append(outputs[i])
+    return f1_score(labels2, outputs2, average='micro')
+
+
 def evaluate(model, criterion, data_eval_iterator, num_batches, params, id2val_entity):
-     
+    
     model.eval()
     total_loss = 0.0
     total_acc = 0.0
+    total_f1_score = 0.0
+
     with torch.no_grad():
         batches = trange(num_batches)
         for batch in batches:
@@ -117,15 +141,17 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, params, id2val_e
                             luke_labels[i][j] = val2id[predicted_sequences[i][j]]
 
                 luke_labels = torch.LongTensor(luke_labels)
-                if params.cuda:
-                    luke_labels = luke_labels.cuda()
+                # if params.cuda:
+                #     luke_labels = luke_labels.cuda()
+                luke_labels = luke_labels.to(device=params.device)
 
                 outputs = luke_labels.ravel()
                 labels = original_labels
 
+            #labels = torch.LongTensor(labels)
             labels = torch.LongTensor(labels)
-            if params.cuda:
-                labels = labels.cuda()
+            #if params.cuda:
+            labels = labels.to(device=params.device)
 
             if params.we_method.lower() == 'luke':
                 max_num = max([len(l) for l in entity_labels])
@@ -133,8 +159,8 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, params, id2val_e
                     maxlen=max_num, value=params.pad_tag_num, padding="post",
                     dtype="long", truncating="post")
                 entity_labels = torch.LongTensor(entity_labels)
-                if params.cuda:
-                    entity_labels = entity_labels.cuda()
+                #if params.cuda:
+                entity_labels = entity_labels.to(device=params.device)
                 loss = criterion(entity_outputs, entity_labels)
             else:
                 loss = criterion(outputs, labels)
@@ -144,10 +170,13 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, params, id2val_e
 
             total_loss += loss.item()
             total_acc += accuracy(outputs, labels)
+            total_f1_score += f1(outputs, labels)
 
     avg_loss = total_loss / num_batches
     avg_acc = total_acc / num_batches
-    return avg_loss, avg_acc
+    avg_f1_score = total_f1_score / num_batches
+
+    return avg_loss, avg_acc, avg_f1_score
 
 
 def train(model, optimizer, criterion, data_train_iterator, num_batches, params, id2val_entity, val2id):
@@ -155,6 +184,7 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params,
     model.train()
     total_loss = 0.0
     total_acc = 0.0
+    total_f1_score = 0.0
 
     batches = trange(num_batches)
     for batch in batches:
@@ -220,15 +250,16 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params,
                         luke_labels[i][j] = val2id[predicted_sequences[i][j]]
 
             luke_labels = torch.LongTensor(luke_labels)
-            if params.cuda:
-                luke_labels = luke_labels.cuda()
+            #if params.cuda:
+            luke_labels = luke_labels.to(device=params.device)
 
             outputs = luke_labels.ravel()
             labels = original_labels
 
+        #labels = torch.LongTensor(labels)
         labels = torch.LongTensor(labels)
-        if params.cuda:
-            labels = labels.cuda()
+        #if params.cuda:
+        labels = labels.to(device=params.device)
 
         if params.we_method.lower() == 'luke':
             max_num = max([len(l) for l in entity_labels])
@@ -236,12 +267,12 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params,
                 maxlen=max_num, value=params.pad_tag_num, padding="post",
                 dtype="long", truncating="post")
             entity_labels = torch.LongTensor(entity_labels)
-            if params.cuda:
-                entity_labels = entity_labels.cuda()
+            #if params.cuda:
+            entity_labels = entity_labels.to(device=params.device)
             loss = criterion(entity_outputs, entity_labels)
         else:
             loss = criterion(outputs, labels)
-
+        
         optimizer.zero_grad()
         loss.backward()
 
@@ -256,23 +287,29 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params,
         else:
             total_acc += accuracy(outputs, labels)
 
+        total_f1_score += f1(outputs, labels)
+
         batches.set_postfix(accuracy='{:05.3f}'.format(total_acc/(batch+1)), loss='{:05.3f}'.format(total_loss/(batch+1)))
 
     avg_loss = total_loss / num_batches
     avg_acc = total_acc / num_batches
+    avg_f1_score = total_f1_score / num_batches
 
-    return avg_loss, avg_acc
+    return avg_loss, avg_acc, avg_f1_score
 
 
 
 if __name__ == '__main__':
-
+    print("train start")
     params = params.Params()
 
-    params.cuda = torch.cuda.is_available()
     torch.manual_seed(params.seed)
-    if params.cuda:
+    #params.cuda = torch.cuda.is_available()
+    if torch.cuda.is_available():
+        params.device = torch.device('cuda')
         torch.cuda.manual_seed(params.seed)
+    elif torch.backends.mps.is_available():
+        params.device = torch.device('mps')
 
     # Getting data:
     dataset_loader = DatasetLoader(params)
@@ -283,7 +320,8 @@ if __name__ == '__main__':
     data_train = dataset_loader.load_data("train", params)
     data_val = dataset_loader.load_data("val", params)
 
-    model = Model(params, id2val, val2id, val2id_entity).cuda() if params.cuda else Model(params, id2val, val2id, val2id_entity)
+    #model = Model(params, id2val, val2id, val2id_entity).cuda() if params.cuda else Model(params, id2val, val2id, val2id_entity)
+    model = Model(params, id2val, val2id, val2id_entity).to(device=params.device)
     optimizer = optim.Adam(model.parameters(), lr=params.learning_rate)
  
     criterion = loss_fun    
@@ -293,6 +331,9 @@ if __name__ == '__main__':
     best_epoch = -1
     best_epoch_loss = -1.0
     total_time = 0.0
+
+    best_f1_score = -1.0
+    best_f1_epoch = -1
     
     for epoch in range(params.num_epochs):
         print("Epoch {}/{}".format(epoch + 1, params.num_epochs), )
@@ -300,25 +341,27 @@ if __name__ == '__main__':
         start_train_time = time.time()
         # Training:
         num_batches = (params.train_size + 1) // params.train_batch_size           # number of batches in one epoch
-        data_train_iterator = dataset_loader.data_iterator(data_train, params.train_size, params.train_batch_size, params, shuffle=False)
-        avg_loss, avg_acc = train(model, optimizer, criterion, data_train_iterator, num_batches, params, id2val_entity, val2id)
+        data_train_iterator = dataset_loader.data_iterator(data_train, params.train_size, params.train_batch_size, params, shuffle=True)
+        avg_loss, avg_acc, avg_f1_score = train(model, optimizer, criterion, data_train_iterator, num_batches, params, id2val_entity, val2id)
 
         end_train_time = time.time()
         train_time = end_train_time - start_train_time
         print("Average train loss: ", avg_loss)
         print("Average train accuracy: ", avg_acc)
+        print("Average train f1 score: ", avg_f1_score)
         print("Training time: ", train_time, "\n")
         total_time += train_time
 
         # Validation:
         num_batches = (params.val_size + 1) // params.val_batch_size
         data_val_iterator = dataset_loader.data_iterator(data_val, params.val_size, params.val_batch_size, params, shuffle=False)
-        avg_loss, avg_acc = evaluate(model, criterion, data_val_iterator, num_batches, params, id2val_entity)
+        avg_loss, avg_acc, avg_f1_score = evaluate(model, criterion, data_val_iterator, num_batches, params, id2val_entity)
 
         end_val_time = time.time()
         val_time = end_val_time - end_train_time
         print("Average val loss: ", avg_loss)
         print("Average val accuracy: ", avg_acc)
+        print("Average val f1 score: ", avg_f1_score)
         print("Validation time: ", val_time, "\n\n")
         total_time += val_time
 
@@ -326,8 +369,13 @@ if __name__ == '__main__':
             best_acc = avg_acc
             best_epoch = epoch
             best_epoch_loss = avg_loss
+        
+        if avg_f1_score > best_f1_score:
+            best_f1_score = avg_f1_score
+            best_f1_epoch = epoch
 
     print("\nBest accuracy: {:05.3f} for epoch number {} with the loss: {:05.3f}".format(best_acc, best_epoch+1, best_epoch_loss))
+    print("\nBest f1 score: {:05.3f} for epoch number {}".format(best_f1_score, best_f1_epoch))
 
     
     print("\n\nTesting...")
@@ -336,10 +384,11 @@ if __name__ == '__main__':
     start_test_time = time.time()
     num_batches = (params.test_size + 1) // params.val_batch_size
     data_test_iterator = dataset_loader.data_iterator(data_test, params.test_size, params.val_batch_size, params, shuffle=False)
-    avg_loss, avg_acc = evaluate(model, criterion, data_test_iterator, num_batches, params, id2val_entity)
+    avg_loss, avg_acc, avg_f1_score = evaluate(model, criterion, data_test_iterator, num_batches, params, id2val_entity)
     end_test_time = time.time()
     test_time = start_test_time - end_test_time
     total_time += test_time
 
     print("Test accuracy: {:05.3f} with the loss: {:05.3f}".format(avg_acc, avg_loss))
+    print("Test f1 score: {:05.3f}".format(avg_f1_score))
     print("Total time: {:05.3f}". format(total_time))

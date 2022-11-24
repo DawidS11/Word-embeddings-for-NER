@@ -8,8 +8,7 @@ from allennlp.modules.elmo import Elmo, batch_to_ids
 from transformers import BertTokenizer, BertModel
 from transformers import RobertaTokenizer, RobertaModel
 from transformers import LukeTokenizer, LukeModel
-
-from keras.preprocessing.sequence import pad_sequences
+from keras_preprocessing.sequence import pad_sequences
 
 class Model(nn.Module):
 
@@ -29,8 +28,8 @@ class Model(nn.Module):
             self.embedding = nn.Embedding(params.vocab_size, params.glove_dim)
             emb = torch.from_numpy(np.load(os.path.join(params.glove_dir, 'glove_{}d.npy'.format(params.glove_dim)), allow_pickle=True))
 
-            if params.cuda:
-                emb = emb.cuda()
+            #if params.cuda:
+            emb = emb.to(device=params.device)
             self.embedding.weight.data.copy_(emb)
 
             params.embedding_dim = params.glove_dim
@@ -110,9 +109,10 @@ class Model(nn.Module):
                 dtype="long", truncating="post")
 
 
+            # sentences = torch.LongTensor(sentences)
             sentences = torch.LongTensor(sentences)
-            if self.params.cuda:
-                sentences = sentences.cuda()
+            #if self.params.cuda:
+            sentences = sentences.to(device=self.params.device)
 
             x = self.embedding(sentences)
         
@@ -139,8 +139,8 @@ class Model(nn.Module):
                 dtype="long", truncating="post")
 
             sentences = torch.LongTensor(sentences)
-            if self.params.cuda:
-                sentences = sentences.cuda()
+            #if self.params.cuda:
+            sentences = sentences.to(device=self.params.device)
             x = self.embedding(sentences)['elmo_representations'][0]
 
 
@@ -191,15 +191,16 @@ class Model(nn.Module):
             
             attention_mask = (labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)
-            if self.params.cuda:
-                attention_mask = attention_mask.cuda()
+            #if self.params.cuda:
+            attention_mask = attention_mask.to(device=self.params.device)
 
             inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
                             maxlen=max_num, dtype="long", truncating="post", padding="post")
 
+            #inputs = torch.LongTensor(inputs)
             inputs = torch.LongTensor(inputs)
-            if self.params.cuda:
-                inputs = inputs.cuda()
+            #if self.params.cuda:
+            inputs = inputs.to(device=self.params.device)
             
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
             
@@ -251,15 +252,16 @@ class Model(nn.Module):
 
             attention_mask = (labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)
-            if self.params.cuda:
-                attention_mask = attention_mask.cuda()
+            #if self.params.cuda:
+            attention_mask = attention_mask.to(device=self.params.device)
 
             inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
                           maxlen=max_num, dtype="long", truncating="post", padding="post")
 
+            #inputs = torch.LongTensor(inputs)
             inputs = torch.LongTensor(inputs)
-            if self.params.cuda:
-                inputs = inputs.cuda()
+            #if self.params.cuda:
+            inputs = inputs.to(device=self.params.device)
 
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
 
