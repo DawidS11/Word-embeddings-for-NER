@@ -214,61 +214,64 @@ class Model(nn.Module):
             
 
         elif self.we_method == 'roberta':
-            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
-            labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
 
-            tokenized_sentences = []
-            tokenized_sen = []
-            tokenized_word = []
+            # ##
+            # sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            # labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+
+            # tokenized_sentences = []
+            # tokenized_sen = []
+            # tokenized_word = []
             
-            tokenized_labels = []
-            tokenized_sen_labels = []
-            idx = -1
-            is_first = True
+            # tokenized_labels = []
+            # tokenized_sen_labels = []
+            # idx = -1
+            # is_first = True
 
-            for sen, lab in zip(sentences, labels):
-                idx = -1
-                for word in sen:
-                    idx += 1
-                    tokenized_word = self.tokenizer.tokenize(word)
+            # for sen, lab in zip(sentences, labels):
+            #     idx = -1
+            #     for word in sen:
+            #         idx += 1
+            #         tokenized_word = self.tokenizer.tokenize(word)
 
-                    is_first = True
-                    for token in tokenized_word:
-                        tokenized_sen.append(token)
-                        if is_first:
-                            tokenized_sen_labels.append(lab[idx])
-                            is_first = False
-                        else:
-                            tokenized_sen_labels.append(-1)
+            #         is_first = True
+            #         for token in tokenized_word:
+            #             tokenized_sen.append(token)
+            #             if is_first:
+            #                 tokenized_sen_labels.append(lab[idx])
+            #                 is_first = False
+            #             else:
+            #                 tokenized_sen_labels.append(-1)
 
-                tokenized_sentences.append(tokenized_sen)
-                tokenized_labels.append(tokenized_sen_labels)
-                tokenized_sen = []
-                tokenized_sen_labels = []
-            for sen, lab in zip(tokenized_sentences, tokenized_labels):
-                if sen[0] != "<s>":
-                    sen.insert(0, "<s>")
-                    sen.append("</s>")
-                    lab.insert(0, self.params.pad_tag_num)
-                    lab.append(self.params.pad_tag_num)
+            #     tokenized_sentences.append(tokenized_sen)
+            #     tokenized_labels.append(tokenized_sen_labels)
+            #     tokenized_sen = []
+            #     tokenized_sen_labels = []
+            # for sen, lab in zip(tokenized_sentences, tokenized_labels):
+            #     if sen[0] != "<s>":
+            #         sen.insert(0, "<s>")
+            #         sen.append("</s>")
+            #         lab.insert(0, self.params.pad_tag_num)
+            #         lab.append(self.params.pad_tag_num)
 
-            labels = tokenized_labels
-            max_num = max([len(l) for l in labels])
-            labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=max_num, value=self.params.pad_tag_num, padding="post",       
-                dtype="long", truncating="post")
+            # labels = tokenized_labels
+            # max_num = max([len(l) for l in labels])
+            # labels = pad_sequences([[l for l in lab] for lab in labels],
+            #     maxlen=max_num, value=self.params.pad_tag_num, padding="post",       
+            #     dtype="long", truncating="post")
+            # ##
 
             attention_mask = (labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)
-            #if self.params.cuda:
             attention_mask = attention_mask.to(device=self.params.device)
 
-            inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
-                          maxlen=max_num, dtype="long", truncating="post", padding="post")
+            # ##
+            # inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
+            #               maxlen=max_num, dtype="long", truncating="post", padding="post")
+            
+            # ##
 
-            #inputs = torch.LongTensor(inputs)
-            inputs = torch.LongTensor(inputs)
-            #if self.params.cuda:
+            inputs = torch.LongTensor(sentences)
             inputs = inputs.to(device=self.params.device)
 
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
