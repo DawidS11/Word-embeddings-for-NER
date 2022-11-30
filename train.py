@@ -13,24 +13,47 @@ from model import Model
 from dataset_loader import DatasetLoader
 from keras_preprocessing.sequence import pad_sequences
 from sklearn.metrics import f1_score
+import seqeval.metrics
 import params
 
 
 def accuracy_luke(outputs, labels):
-
     labels = labels.ravel()         # (1D: batch_size*seq_len)
-
     mask = (labels >= 0)
-
     outputs = np.array(outputs)
 
     return np.sum(outputs == labels)/float(np.sum(mask)) 
 
 
-def loss_fun(outputs, labels):
-    
+def stats(outputs, labels, show_table = False):
     labels = labels.ravel()         # (1D: batch_size*seq_len)
+    mask = (labels >= 0)
+    outputs = np.argmax(outputs, axis=1)
+    
+    accuracy = np.sum(outputs == labels)/float(np.sum(mask))
 
+    labels_not_masked = []
+    outputs_not_masked = []
+    for i in range(len(mask)):
+        if mask[i]:
+            labels_not_masked.append(labels[i])
+            outputs_not_masked.append(outputs[i])
+
+    f1 = f1_score(labels_not_masked, outputs_not_masked, average='micro')
+    
+    labels_vals = [id2val[label] for label in labels_not_masked]
+    outputs_vals = [id2val[output] for output in outputs_not_masked]
+
+    # if show_table:
+        # labels_vals = [id2val[label] for label in labels_not_masked]
+        # outputs_vals = [id2val[output] for output in outputs_not_masked]
+        #print("\n", seqeval.metrics.classification_report([labels_vals], [outputs_vals], digits=4)) 
+
+    return accuracy, f1, labels_vals, outputs_vals
+
+
+def loss_fun(outputs, labels):
+    labels = labels.ravel()         # (1D: batch_size*seq_len)
     mask = (labels >= 0).float()
     
     #labels = labels % outputs.shape[1]     # nie dziala z device="mps"
@@ -46,7 +69,6 @@ def loss_fun(outputs, labels):
 
 
 def accuracy(outputs, labels):
-
     labels = labels.ravel()         # (1D: batch_size*seq_len)
     mask = (labels >= 0)
     outputs = np.argmax(outputs, axis=1)
@@ -55,8 +77,6 @@ def accuracy(outputs, labels):
 
 
 def f1(outputs, labels): 
-    #sklearn.metrics.f1_score(labels, outputs, average='micro')
-
     labels = labels.ravel()
     mask = (labels >= 0)
     outputs = np.argmax(outputs, axis=1)
@@ -66,15 +86,18 @@ def f1(outputs, labels):
         if mask[i]:
             labels2.append(labels[i])
             outputs2.append(outputs[i])
+
     return f1_score(labels2, outputs2, average='micro')
 
 
-def evaluate(model, criterion, data_eval_iterator, num_batches, params, id2val_entity):
+def evaluate(model, criterion, data_eval_iterator, num_batches, params, id2val_entity, show_table = False):
     
     model.eval()
     total_loss = 0.0
     total_acc = 0.0
     total_f1_score = 0.0
+    all_labels = []
+    all_outputs = []
 
     with torch.no_grad():
         batches = trange(num_batches)
@@ -169,8 +192,15 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, params, id2val_e
             labels = labels.data.cpu().numpy()
 
             total_loss += loss.item()
-            total_acc += accuracy(outputs, labels)
-            total_f1_score += f1(outputs, labels)
+            acc, f1, labels_vals, outputs_vals = stats(outputs, labels, show_table = show_table)
+            total_acc += acc
+            total_f1_score += f1
+            all_outputs.append(outputs_vals)
+            all_labels.append(labels_vals) 
+
+    flat_labels = [item for sublist in all_labels for item in sublist]
+    flat_outputs = [item for sublist in all_outputs for item in sublist]
+    print("\nEvaluation table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
 
     avg_loss = total_loss / num_batches
     avg_acc = total_acc / num_batches
@@ -179,19 +209,26 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, params, id2val_e
     return avg_loss, avg_acc, avg_f1_score
 
 
-def train(model, optimizer, criterion, data_train_iterator, num_batches, params, id2val_entity, val2id):
+def train(model, optimizer, criterion, data_train_iterator, num_batches, params, id2val_entity, val2id, id2val):
 
     model.train()
     total_loss = 0.0
     total_acc = 0.0
     total_f1_score = 0.0
+    all_outputs = []
+    all_labels = []
 
     batches = trange(num_batches)
     for batch in batches:
 
         sentences, labels, contexts = next(data_train_iterator)
-
         outputs, labels = model(sentences, labels, contexts)
+
+        #print("\n\n", outputs, "\n\n", labels, "\n")
+        #quit()
+        # ##
+
+
 
         if params.we_method.lower() == 'luke':                      # odczytanie labeli encji
             entity_outputs = outputs
@@ -250,15 +287,12 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params,
                         luke_labels[i][j] = val2id[predicted_sequences[i][j]]
 
             luke_labels = torch.LongTensor(luke_labels)
-            #if params.cuda:
             luke_labels = luke_labels.to(device=params.device)
 
             outputs = luke_labels.ravel()
             labels = original_labels
 
-        #labels = torch.LongTensor(labels)
         labels = torch.LongTensor(labels)
-        #if params.cuda:
         labels = labels.to(device=params.device)
 
         if params.we_method.lower() == 'luke':
@@ -285,12 +319,17 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params,
         if params.we_method.lower() == 'luke':
             total_acc += accuracy_luke(outputs, labels)
         else:
-            total_acc += accuracy(outputs, labels)
-
-        total_f1_score += f1(outputs, labels)
+            acc, f1, labels_vals, outputs_vals = stats(outputs, labels)
+            total_acc += acc
+            total_f1_score += f1
+            all_outputs.append(outputs_vals)
+            all_labels.append(labels_vals) 
 
         batches.set_postfix(accuracy='{:05.3f}'.format(total_acc/(batch+1)), loss='{:05.3f}'.format(total_loss/(batch+1)))
 
+    flat_labels = [item for sublist in all_labels for item in sublist]
+    flat_outputs = [item for sublist in all_outputs for item in sublist]
+    print("\nTraining table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
     avg_loss = total_loss / num_batches
     avg_acc = total_acc / num_batches
     avg_f1_score = total_f1_score / num_batches
@@ -342,7 +381,7 @@ if __name__ == '__main__':
         # Training:
         num_batches = (params.train_size + 1) // params.train_batch_size           # number of batches in one epoch
         data_train_iterator = dataset_loader.data_iterator(data_train, params.train_size, params.train_batch_size, params, shuffle=True)
-        avg_loss, avg_acc, avg_f1_score = train(model, optimizer, criterion, data_train_iterator, num_batches, params, id2val_entity, val2id)
+        avg_loss, avg_acc, avg_f1_score = train(model, optimizer, criterion, data_train_iterator, num_batches, params, id2val_entity, val2id, id2val)
 
         end_train_time = time.time()
         train_time = end_train_time - start_train_time
@@ -384,7 +423,7 @@ if __name__ == '__main__':
     start_test_time = time.time()
     num_batches = (params.test_size + 1) // params.val_batch_size
     data_test_iterator = dataset_loader.data_iterator(data_test, params.test_size, params.val_batch_size, params, shuffle=False)
-    avg_loss, avg_acc, avg_f1_score = evaluate(model, criterion, data_test_iterator, num_batches, params, id2val_entity)
+    avg_loss, avg_acc, avg_f1_score = evaluate(model, criterion, data_test_iterator, num_batches, params, id2val_entity, show_table = True)
     end_test_time = time.time()
     test_time = start_test_time - end_test_time
     total_time += test_time

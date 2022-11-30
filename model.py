@@ -10,6 +10,8 @@ from transformers import RobertaTokenizer, RobertaModel
 from transformers import LukeTokenizer, LukeModel
 from keras_preprocessing.sequence import pad_sequences
 
+from prepare_labels import calc_entity_spans
+
 class Model(nn.Module):
 
     def __init__(self, params, id2val, val2id, val2id_entity):
@@ -108,8 +110,6 @@ class Model(nn.Module):
                 maxlen=max_num, value=self.params.pad_tag_num, padding="post",      
                 dtype="long", truncating="post")
 
-
-            # sentences = torch.LongTensor(sentences)
             sentences = torch.LongTensor(sentences)
             #if self.params.cuda:
             sentences = sentences.to(device=self.params.device)
@@ -139,67 +139,75 @@ class Model(nn.Module):
                 dtype="long", truncating="post")
 
             sentences = torch.LongTensor(sentences)
-            #if self.params.cuda:
             sentences = sentences.to(device=self.params.device)
             x = self.embedding(sentences)['elmo_representations'][0]
 
 
         elif self.we_method == 'bert':
-            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
-            labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+
+            # teraz bierzemy caly context. Zmienic na zdanie?
+            # dla conll2003 jest to więcej słó∑ które się na siebie nakładają
+
+
+
+
+            # ##
+            # sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            # labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
             
-            tokenized_sentences = []
-            tokenized_sen = []
-            tokenized_word = []
+            # tokenized_sentences = []
+            # tokenized_sen = []
+            # tokenized_word = []
             
-            tokenized_labels = []
-            tokenized_sen_labels = []
-            idx = -1
-            is_first = True
+            # tokenized_labels = []
+            # tokenized_sen_labels = []
+            # idx = -1
+            # is_first = True
 
-            for sen, lab in zip(sentences, labels):
-                idx = -1
-                for word in sen:
-                    idx += 1
-                    tokenized_word = self.tokenizer.tokenize(word)
+            # for sen, lab in zip(sentences, labels):
+            #     idx = -1
+            #     for word in sen:
+            #         idx += 1
+            #         tokenized_word = self.tokenizer.tokenize(word)
 
-                    is_first = True
-                    for token in tokenized_word:
-                        tokenized_sen.append(token)
-                        if is_first:
-                            tokenized_sen_labels.append(lab[idx])
-                            is_first = False
-                        else:
-                            tokenized_sen_labels.append(-1)
+            #         is_first = True
+            #         for token in tokenized_word:
+            #             tokenized_sen.append(token)
+            #             if is_first:
+            #                 tokenized_sen_labels.append(lab[idx])
+            #                 is_first = False
+            #             else:
+            #                 tokenized_sen_labels.append(-1)
 
-                tokenized_sentences.append(tokenized_sen)
-                tokenized_labels.append(tokenized_sen_labels)
-                tokenized_sen = []
-                tokenized_sen_labels = []
-            for sen, lab in zip(tokenized_sentences, tokenized_labels):
-                if sen[0] != "[CLS]":
-                    sen.insert(0, "[CLS]")
-                    sen.append("[SEP]")
-                    lab.insert(0, self.params.pad_tag_num)
-                    lab.append(self.params.pad_tag_num)
+            #     tokenized_sentences.append(tokenized_sen)
+            #     tokenized_labels.append(tokenized_sen_labels)
+            #     tokenized_sen = []
+            #     tokenized_sen_labels = []
+            # for sen, lab in zip(tokenized_sentences, tokenized_labels):
+            #     if sen[0] != "[CLS]":
+            #         sen.insert(0, "[CLS]")
+            #         sen.append("[SEP]")
+            #         lab.insert(0, self.params.pad_tag_num)
+            #         lab.append(self.params.pad_tag_num)
 
-            labels = tokenized_labels
-            max_num = max([len(l) for l in labels])
-            labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=max_num, value=self.params.pad_tag_num, padding="post",  
-                dtype="long", truncating="post")
+            # labels = tokenized_labels
+            # max_num = max([len(l) for l in labels])
+            # labels = pad_sequences([[l for l in lab] for lab in labels],
+            #     maxlen=max_num, value=self.params.pad_tag_num, padding="post",  
+            #     dtype="long", truncating="post")
+
+            #    ##
             
             attention_mask = (labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)
-            #if self.params.cuda:
             attention_mask = attention_mask.to(device=self.params.device)
 
-            inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
-                            maxlen=max_num, dtype="long", truncating="post", padding="post")
+            # ##
+            # inputs = pad_sequences([self.tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
+            #                 maxlen=max_num, dtype="long", truncating="post", padding="post")
+            # ##
 
-            #inputs = torch.LongTensor(inputs)
-            inputs = torch.LongTensor(inputs)
-            #if self.params.cuda:
+            inputs = torch.LongTensor(sentences)
             inputs = inputs.to(device=self.params.device)
             
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
@@ -267,9 +275,9 @@ class Model(nn.Module):
 
 
         elif self.we_method == 'luke':
-            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]         # tu nie bedzie sentence?
             #labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
-
+            
             all_entities = calc_entity_spans(contexts)
 
             entities = []
@@ -293,7 +301,7 @@ class Model(nn.Module):
             #     dtype="long", truncating="post")
 
             texts = [" ".join(sen) for sen in sentences]
-
+            
             inputs_emb = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
 
             # inputs = inputs_emb
@@ -305,25 +313,21 @@ class Model(nn.Module):
 
             # inputs = torch.LongTensor(inputs2)
             # attention_mask = torch.LongTensor(attention_mask2)
-            # entity_attention_mask = torch.LongTensor(entity_attention_mask)
-            # entity_ids = torch.LongTensor(entity_ids)
+            # entity_attention_mask = torch.LongTensor(entity_attention_mask)8
             # entity_position_ids = torch.LongTensor(entity_position_ids)
 
             # if self.params.cuda:
             #     inputs = inputs.cuda()
-            #     attention_mask = attention_mask.cuda()
+            #     attention_mask = attention_mask.cuda() 
             #     entity_attention_mask = entity_attention_mask.cuda()
             #     entity_ids = entity_ids.cuda()
             #     entity_position_ids = entity_position_ids.cuda()
 
-            # outputs = self.embedding(inputs, attention_mask=attention_mask, entity_attention_mask=entity_attention_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids)
-
-            if self.params.cuda:
-                inputs_emb = inputs_emb.to("cuda")
+            # outputs = self.embedding(inputs, attention_mask=attention_mask, entity_attention_mask=entity_attent ion_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids)
+            inputs_emb = inputs_emb.to(device=self.params.device)
             outputs = self.embedding(**inputs_emb)
             del inputs_emb
             x = outputs['entity_last_hidden_state']
-
             labels = entity_labels
 
         else:
@@ -345,43 +349,3 @@ class Model(nn.Module):
         x = self.fc(x)
 
         return F.log_softmax(x, dim=1), labels
-
-
-def calc_entity_spans(contexts):
-
-    all_entities = []
-    all_context_entities = []
-
-    for context in contexts:
-
-        beg = 0
-        end = 0
-        text = context['context_text']
-
-        for i in range(context['sentence_beg']):            # przesuniecie beg na poczatek zdania w calym tekscie
-            beg += len(text[i])
-            
-        for idx in range(context['sentence_beg'], context['sentence_end']):
-            end = beg
-            entity = text[idx]
-
-            for idx2 in range(idx, context['sentence_end']):
-                end += len(text[idx2])
-                if idx != idx2:
-                    entity += " "
-                    entity += text[idx2]
-
-                all_context_entities.append(dict(
-                    entity_span=(beg, end),
-                    entity_label="NIL",                 # NIL, bo nie jest wykorzystywane
-                    entity_text=entity,
-                ))
-
-                
-            beg += len(text[idx])
-
-        all_entities.append(all_context_entities)
-        all_context_entities = []
-
-
-    return all_entities
