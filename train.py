@@ -222,7 +222,7 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches, params,
     for batch in batches:
 
         sentences, labels, contexts = next(data_train_iterator)
-        outputs, labels = model(sentences, labels, contexts)
+        outputs, labels = model(sentences, labels, contexts)            # W modelu padding labels do najdluzszego zdania w batch.
 
         #print("\n\n", outputs, "\n\n", labels, "\n")
         #quit()

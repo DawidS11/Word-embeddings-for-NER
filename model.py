@@ -11,6 +11,7 @@ from transformers import LukeTokenizer, LukeModel
 from keras_preprocessing.sequence import pad_sequences
 
 from prepare_labels import calc_entity_spans
+from dataset_loader import prepare_elmo, prepare_bert_roberta
 
 class Model(nn.Module):
 
@@ -105,48 +106,46 @@ class Model(nn.Module):
             sentences = pad_sequences([[w for w in sen] for sen in sentences],
                           maxlen=max_num, dtype="long", truncating="post", padding="post")
 
-
             labels = pad_sequences([[l for l in lab] for lab in labels],
                 maxlen=max_num, value=self.params.pad_tag_num, padding="post",      
                 dtype="long", truncating="post")
 
             sentences = torch.LongTensor(sentences)
-            #if self.params.cuda:
             sentences = sentences.to(device=self.params.device)
 
             x = self.embedding(sentences)
         
         elif self.we_method == 'elmo':
-            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
-            labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
-            max_num = max([len(s) for s in sentences])
 
-            sentences_padded = []
-            tmp_sen = []
-            for sen in sentences:
-                for i in range(max_num):
-                    if i < len(sen):
-                        tmp_sen.append(sen[i])
-                    else:
-                        tmp_sen.append(self.params.pad_word)
-                sentences_padded.append(tmp_sen)
-                tmp_sen = []
+            ##
+            # sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            # labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+            # max_num = max([len(s) for s in labels])
 
-            sentences = batch_to_ids(sentences_padded)
+            # sentences_padded = pad_sequences([[s for s in sen] for sen in sentences],
+            #     maxlen=max_num, value=self.params.pad_word, padding="post",      
+            #     dtype=object, truncating="post")
 
-            labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=max_num, value=self.params.pad_tag_num, padding="post",       #self.tags[self.params.pad_tag]   self.params.pad_tag_num
-                dtype="long", truncating="post")
+            # sentences = batch_to_ids(sentences_padded)
 
-            sentences = torch.LongTensor(sentences)
-            sentences = sentences.to(device=self.params.device)
-            x = self.embedding(sentences)['elmo_representations'][0]
+            # labels = pad_sequences([[l for l in lab] for lab in labels],
+            #     maxlen=max_num, value=self.params.pad_tag_num, padding="post",      
+            #     dtype="long", truncating="post")
+            ##
+            sentences = prepare_elmo(contexts)
+
+# ##
+            inputs = torch.LongTensor(sentences)
+            inputs = inputs.to(device=self.params.device)
+
+# ##
+            x = self.embedding(inputs)['elmo_representations'][0]
 
 
         elif self.we_method == 'bert':
 
             # teraz bierzemy caly context. Zmienic na zdanie?
-            # dla conll2003 jest to więcej słó∑ które się na siebie nakładają
+            # dla conll2003 jest to więcej słów które się na siebie nakładają
 
 
 
@@ -198,7 +197,11 @@ class Model(nn.Module):
 
             #    ##
             
-            attention_mask = (labels >= 0)
+            tokenized_sentences, tokenized_labels = prepare_bert_roberta(self.params, self.tokenizer, contexts)
+            
+            labels = tokenized_labels           # zmienic potem przy return
+
+            attention_mask = (tokenized_labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)
             attention_mask = attention_mask.to(device=self.params.device)
 
@@ -207,10 +210,12 @@ class Model(nn.Module):
             #                 maxlen=max_num, dtype="long", truncating="post", padding="post")
             # ##
 
-            inputs = torch.LongTensor(sentences)
+# ##
+            inputs = torch.LongTensor(tokenized_sentences)
             inputs = inputs.to(device=self.params.device)
-            
+# ##       
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
+            del inputs
             
 
         elif self.we_method == 'roberta':
@@ -261,7 +266,11 @@ class Model(nn.Module):
             #     dtype="long", truncating="post")
             # ##
 
-            attention_mask = (labels >= 0)
+            tokenized_sentences, tokenized_labels = prepare_bert_roberta(self.params, self.tokenizer, contexts)
+
+            labels = tokenized_labels           # zmienic potem przy return
+            
+            attention_mask = (tokenized_labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)
             attention_mask = attention_mask.to(device=self.params.device)
 
@@ -271,10 +280,12 @@ class Model(nn.Module):
             
             # ##
 
-            inputs = torch.LongTensor(sentences)
+# ##
+            inputs = torch.LongTensor(tokenized_sentences)
             inputs = inputs.to(device=self.params.device)
-
+# ##
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
+            del inputs
 
 
         elif self.we_method == 'luke':
