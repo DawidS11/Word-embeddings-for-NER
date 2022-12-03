@@ -10,8 +10,7 @@ from transformers import RobertaTokenizer, RobertaModel
 from transformers import LukeTokenizer, LukeModel
 from keras_preprocessing.sequence import pad_sequences
 
-from prepare_labels import calc_entity_spans
-from dataset_loader import prepare_elmo, prepare_bert_roberta
+from dataset_loader import prepare_elmo, prepare_bert_roberta, prepare_luke, calc_entity_spans
 
 class Model(nn.Module):
 
@@ -99,7 +98,7 @@ class Model(nn.Module):
             labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
             max_num = max([len(s) for s in sentences])
 
-            max_len = max(map(lambda x: len(x), sentences))#, default=0)                                                                          # DEFAULT
+            max_len = max(map(lambda x: len(x), sentences))#, default=0)                                               # DEFAULT
             sentences = list(map(lambda x: list(map(lambda w: self.word2id.get(w, 0), x)), sentences))
             sentences = list(map(lambda x: x + [self.params.vocab_size-1] * (max_len - len(x)), sentences))
 
@@ -115,6 +114,7 @@ class Model(nn.Module):
 
             x = self.embedding(sentences)
         
+
         elif self.we_method == 'elmo':
 
             sentences, labels = prepare_elmo(self.params, contexts)
@@ -156,60 +156,43 @@ class Model(nn.Module):
 
 
         elif self.we_method == 'luke':
-            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]         # tu nie bedzie sentence?
+            #sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]         # tu nie bedzie sentence?
             #labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
             
-            all_entities = calc_entity_spans(contexts)
+            # all_entities = calc_entity_spans(contexts, self.id2val)
 
-            entities = []
-            entity_spans = []
-            entity_labels = []
-            for context in all_entities:
-                context_entities = []
-                context_spans = []
-                context_labels = []
-                for entity in context:
-                    context_entities.append(entity['entity_text'])
-                    context_spans.append(entity['entity_span'])
-                    context_labels.append(self.val2id_entity[entity['entity_label']])
-                entities.append(context_entities)
-                entity_spans.append(context_spans)
-                entity_labels.append(context_labels)
+            # entities = []
+            # entity_spans = []
+            # entity_labels = []
+            # for context in all_entities:
+            #     context_entities = []
+            #     context_spans = []
+            #     context_labels = []
+            #     for entity in context:
+            #         context_entities.append(entity['entity_text'])
+            #         context_spans.append(entity['entity_span'])
+            #         context_labels.append(self.val2id_entity[entity['entity_label']])
+            #     entities.append(context_entities)
+            #     entity_spans.append(context_spans)
+            #     entity_labels.append(context_labels)
+
 
             # max_num = max([len(l) for l in entity_labels])
             # entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
             #     maxlen=max_num, value=self.params.pad_tag_num, padding="post",
             #     dtype="long", truncating="post")
 
-            texts = [" ".join(sen) for sen in sentences]
-            
-            inputs_emb = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
 
-            # inputs = inputs_emb
-            # inputs2 = inputs["input_ids"].long()
-            # attention_mask2 = inputs["attention_mask"].long()
-            # entity_attention_mask = inputs["entity_attention_mask"].long()
-            # entity_ids = inputs["entity_ids"].long()
-            # entity_position_ids = inputs["entity_position_ids"].long()
+            # texts = [" ".join(sen) for sen in sentences]
+            # inputs_emb = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
 
-            # inputs = torch.LongTensor(inputs2)
-            # attention_mask = torch.LongTensor(attention_mask2)
-            # entity_attention_mask = torch.LongTensor(entity_attention_mask)8
-            # entity_position_ids = torch.LongTensor(entity_position_ids)
-
-            # if self.params.cuda:
-            #     inputs = inputs.cuda()
-            #     attention_mask = attention_mask.cuda() 
-            #     entity_attention_mask = entity_attention_mask.cuda()
-            #     entity_ids = entity_ids.cuda()
-            #     entity_position_ids = entity_position_ids.cuda()
+            inputs_emb, labels = prepare_luke(contexts, self.tokenizer, self.id2val, self.val2id_entity)
 
             # outputs = self.embedding(inputs, attention_mask=attention_mask, entity_attention_mask=entity_attent ion_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids)
             inputs_emb = inputs_emb.to(device=self.params.device)
             outputs = self.embedding(**inputs_emb)
             del inputs_emb
             x = outputs['entity_last_hidden_state']
-            labels = entity_labels
 
         else:
             print("forward: we_method nie zostala wybrana. ")

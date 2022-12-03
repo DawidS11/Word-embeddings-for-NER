@@ -171,3 +171,131 @@ def prepare_bert_roberta(params, tokenizer, contexts):
                         maxlen=max_num, dtype="long", truncating="post", padding="post")
 
     return tokenized_sentences, tokenized_labels
+
+
+def prepare_luke(contexts, tokenizer, id2val, val2id_entity):
+
+    all_entities = calc_entity_spans(contexts, id2val)
+
+    entities = []
+    entity_spans = []
+    entity_labels = []
+    for context in all_entities:
+        context_entities = []
+        context_spans = []
+        context_labels = []
+        for entity in context:
+            context_entities.append(entity['entity_text'])
+            context_spans.append(entity['entity_span'])
+            context_labels.append(val2id_entity[entity['entity_label']])
+        entities.append(context_entities)
+        entity_spans.append(context_spans)
+        entity_labels.append(context_labels)
+
+    context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]         # tu nie bedzie sentence?
+    texts = [" ".join(sen) for sen in context_texts]
+    inputs_emb = tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
+
+    return inputs_emb, entity_labels
+
+
+def calc_entity_spans(contexts, id2val):
+    all_context_entities = []
+    all_entities = []
+
+    for context in contexts:
+
+        beg = 0
+        end = 0
+        text = context['context_text']
+        #labels = context['labels']
+        labels = [id2val[l] for l in context['labels']]
+
+        for i in range(context['sentence_beg']):            # przesuniecie beg na poczatek zdania w calym tekscie
+            beg += len(text[i])
+            
+        # for idx in range(context['sentence_beg'], context['sentence_end']):
+        for idx in range(len(labels)):
+            end = beg
+            entity = text[idx]
+
+            for idx2 in range(idx, len(labels)):        # context['sentence_end']
+                end += len(text[idx2])
+                if idx != idx2:
+                    entity += " "
+                    entity += text[idx2]
+
+                    # przypadki:
+                    #     1) jest 'O' i nastepna to 'O'      
+                    #     2) jest cos i nastepna to 'O'   
+                    #     3) jest 'O' i nastepna to cos
+                    #     4) jest ta sama koncowka ale rozne poczatki - sprawdzic poprawnosc
+                    #     5) sa te same poczatki: jesli B- to bedzie jednoslowna, jesli I- to bedzie dluzsza encja
+                    #     6) sa rozne poczatki i rozne koncowki
+                    
+                    if labels[idx2] == 'O':     # 1, 3
+                        label = 'NIL'
+                    elif idx2+1 < context['sentence_end']:
+                        if labels[idx2+1] == 'O':       # 2
+                            if labels[idx][:2] == 'I-':
+                                label = 'NIL'
+                                continue 
+                            for idx3 in range(idx+1, idx2+1):
+                                if labels[idx3][:2] != 'I-' or labels[idx3][2:] != labels[idx][2:]:
+                                    label = 'NIL'
+                                    continue
+
+                        elif labels[idx2+1][2:] != labels[idx2][2:]:         # zaczyna się kolejna encja
+                            if labels[idx][:2] == 'I-':
+                                label = 'NIL'
+                                continue 
+                            for idx3 in range(idx+1, idx2+1):
+                                if labels[idx3][:2] != 'I-' or labels[idx3][2:] != labels[idx][2:]:
+                                    label = 'NIL'
+                                    continue
+
+                        elif labels[idx2+1][:2] != labels[idx2][:2]:
+                            if labels[idx2+1][:2] == 'B-':          # poczatek kolejnej encji
+                                if labels[idx][:2] == 'I-':
+                                    label = 'NIL'
+                                    continue 
+                            for idx3 in range(idx+1, idx2+1):
+                                if labels[idx3][:2] != 'I-' or labels[idx3][2:] != labels[idx][2:]:
+                                    label = 'NIL'
+                                    continue
+
+                            else:   # nastepny label zaczyna sie od 'I-' wiec jest kontynuacja encji
+                                label = 'NIL'
+                        
+                        else:   # nastepny label nie jest 'O', [2:] jest identyczne i [:2] jest identyczne
+                            if labels[idx2+1][:2] == 'B-' and labels[idx2][:2] == 'B-':     # na pewno NIL, bo encja jest dluzsza niz jeden element wiec nie moze miec B- na koncu
+                                label = 'NIL'
+                            elif labels[idx2+1][:2] == 'I-' and labels[idx2][:2] == 'I-':
+                                label = 'NIL'
+
+                else:
+                    if labels[idx2] == 'O':      
+                        label = 'NIL'
+                    elif labels[idx2][:2] == 'I-':
+                        label = 'NIL'
+                    elif idx2+1 < context['sentence_end']:                            # sprawdzenie czy nie jest poczatkiem dluzszej encji    
+                        if labels[idx2+1][2:] == labels[idx2][2:] and labels[idx2+1][:2] == 'I-':
+                            label = 'NIL'
+                        else:
+                            label = labels[idx2][2:]
+                    else:
+                        label = labels[idx2][2:]
+
+                all_context_entities.append(dict(
+                    entity_span=(beg, end), 
+                    entity_text=entity,
+                    entity_label=label,                 # NIL, bo nie jest wykorzystywane
+                ))
+
+                
+            beg += len(text[idx])
+
+        all_entities.append(all_context_entities)
+        all_context_entities = []
+
+    return all_entities
