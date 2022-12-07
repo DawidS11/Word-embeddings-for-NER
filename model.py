@@ -3,14 +3,13 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from allennlp.modules.elmo import Elmo, batch_to_ids
+from allennlp.modules.elmo import Elmo
 from transformers import BertTokenizer, BertModel
 from transformers import RobertaTokenizer, RobertaModel
 from transformers import LukeTokenizer, LukeModel
 from keras_preprocessing.sequence import pad_sequences
 
-from dataset_loader import prepare_elmo, prepare_bert_roberta, prepare_luke, calc_entity_spans
+from dataset_loader import prepare_elmo, prepare_bert_roberta, prepare_luke
 
 class Model(nn.Module):
 
@@ -30,7 +29,6 @@ class Model(nn.Module):
             self.embedding = nn.Embedding(params.vocab_size, params.glove_dim)
             emb = torch.from_numpy(np.load(os.path.join(params.glove_dir, 'glove_{}d.npy'.format(params.glove_dim)), allow_pickle=True))
 
-            #if params.cuda:
             emb = emb.to(device=params.device)
             self.embedding.weight.data.copy_(emb)
 
@@ -98,7 +96,7 @@ class Model(nn.Module):
             labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
             max_num = max([len(s) for s in sentences])
 
-            max_len = max(map(lambda x: len(x), sentences))#, default=0)                                               # DEFAULT
+            max_len = max(map(lambda x: len(x), sentences), default=0)                                   
             sentences = list(map(lambda x: list(map(lambda w: self.word2id.get(w, 0), x)), sentences))
             sentences = list(map(lambda x: x + [self.params.vocab_size-1] * (max_len - len(x)), sentences))
 
@@ -156,43 +154,14 @@ class Model(nn.Module):
 
 
         elif self.we_method == 'luke':
-            #sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]         # tu nie bedzie sentence?
-            #labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
             
-            # all_entities = calc_entity_spans(contexts, self.id2val)
+            sentences, labels = prepare_luke(self.params, contexts, self.tokenizer, self.id2val, self.val2id_entity)
 
-            # entities = []
-            # entity_spans = []
-            # entity_labels = []
-            # for context in all_entities:
-            #     context_entities = []
-            #     context_spans = []
-            #     context_labels = []
-            #     for entity in context:
-            #         context_entities.append(entity['entity_text'])
-            #         context_spans.append(entity['entity_span'])
-            #         context_labels.append(self.val2id_entity[entity['entity_label']])
-            #     entities.append(context_entities)
-            #     entity_spans.append(context_spans)
-            #     entity_labels.append(context_labels)
+            # outputs = self.embedding(inputs, attention_mask=attention_mask, entity_attention_mask=entity_attention_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids)
 
-
-            # max_num = max([len(l) for l in entity_labels])
-            # entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
-            #     maxlen=max_num, value=self.params.pad_tag_num, padding="post",
-            #     dtype="long", truncating="post")
-
-
-            # texts = [" ".join(sen) for sen in sentences]
-            # inputs_emb = self.tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
-
-            inputs_emb, labels = prepare_luke(contexts, self.tokenizer, self.id2val, self.val2id_entity)
-
-            # outputs = self.embedding(inputs, attention_mask=attention_mask, entity_attention_mask=entity_attent ion_mask, entity_ids=entity_ids, entity_position_ids=entity_position_ids)
-            inputs_emb = inputs_emb.to(device=self.params.device)
-            outputs = self.embedding(**inputs_emb)
-            del inputs_emb
-            x = outputs['entity_last_hidden_state']
+            inputs = sentences.to(device=self.params.device)
+            x = self.embedding(**inputs)['entity_last_hidden_state']
+            del inputs
 
         else:
             print("forward: we_method nie zostala wybrana. ")
@@ -212,4 +181,7 @@ class Model(nn.Module):
         x = self.dropout(x)
         x = self.fc(x)
 
-        return F.log_softmax(x, dim=1), labels
+        x_log_softmax = F.log_softmax(x, dim=1)
+        del x
+
+        return x_log_softmax, labels

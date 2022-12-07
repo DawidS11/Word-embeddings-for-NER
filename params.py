@@ -6,9 +6,9 @@ class Params():
         self.val_dataset_size = 0.15
         self.test_dataset_size = 0.15       
 
-        self.we_method = 'bert' # glove / elmo / bert / roberta / luke
+        self.we_method = 'elmo' # glove / elmo / bert / roberta / luke
         self.nn_method = 'rnn' # rnn / lstm / cnn
-        self.dataset_name = 'conll2003' # kaggle / conll2003
+        self.dataset_name = 'kaggle' # kaggle / conll2003
 
         self.device = 'cpu' 
         self.seed = 2022  
@@ -21,7 +21,7 @@ class Params():
 
         self.embedding_dim = 100     
         self.hidden_dim = 100   
-        self.glove_dim = 300
+        self.glove_dim = 50
         self.elmo_dim = 512
         self.bert_dim = 768 
         self.roberta_dim = 768       

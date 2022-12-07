@@ -1,13 +1,10 @@
 import numpy as np
 import random
 from keras_preprocessing.sequence import pad_sequences
+from allennlp.modules.elmo import batch_to_ids
 
 from kaggle_dataset_builder import KaggleDataset
 from conll2003_dataset_builder import Conll2003Dataset
-
-import torch
-from allennlp.modules.elmo import Elmo, batch_to_ids
-from transformers import BertTokenizer, RobertaTokenizer
 
 
 class DatasetLoader(object):
@@ -25,12 +22,8 @@ class DatasetLoader(object):
         self.val2id_entity = self.dataset.val2id_entity
         self.id2val_entity = self.dataset.id2val_entity
 
-        # if self.params.we_method == 'bert':
-        #     self.tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
-        # elif self.params.we_method == 'roberta':
-        #     self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
 
-    def load_data(self, case, params):
+    def load_data(self, case):
         data = {}
         sentences = []
         labels = []
@@ -62,9 +55,6 @@ class DatasetLoader(object):
         data['sentences'] = sentences
         data['labels'] = labels
         data['contexts'] = contexts
-        
-        # if self.params.we_method == 'bert' or self.params.we_method == 'roberta':
-        #     data['prepared_context_text'], data['prepared_context_labels'] = self.prepare_bert_roberta(contexts)
         
         return data
 
@@ -173,7 +163,7 @@ def prepare_bert_roberta(params, tokenizer, contexts):
     return tokenized_sentences, tokenized_labels
 
 
-def prepare_luke(contexts, tokenizer, id2val, val2id_entity):
+def prepare_luke(params, contexts, tokenizer, id2val, val2id_entity):
 
     all_entities = calc_entity_spans(contexts, id2val)
 
@@ -194,9 +184,14 @@ def prepare_luke(contexts, tokenizer, id2val, val2id_entity):
 
     context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]         # tu nie bedzie sentence?
     texts = [" ".join(sen) for sen in context_texts]
-    inputs_emb = tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
+    inputs = tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
 
-    return inputs_emb, entity_labels
+    max_num = max([len(l) for l in entity_labels])
+    entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
+        maxlen=max_num, value=params.pad_tag_num, padding="post",
+        dtype="long", truncating="post")
+
+    return inputs, entity_labels
 
 
 def calc_entity_spans(contexts, id2val):
@@ -210,16 +205,17 @@ def calc_entity_spans(contexts, id2val):
         text = context['context_text']
         #labels = context['labels']
         labels = [id2val[l] for l in context['labels']]
+        len_labels = len(labels)
 
         for i in range(context['sentence_beg']):            # przesuniecie beg na poczatek zdania w calym tekscie
             beg += len(text[i])
             
         # for idx in range(context['sentence_beg'], context['sentence_end']):
-        for idx in range(len(labels)):
+        for idx in range(len_labels):
             end = beg
             entity = text[idx]
 
-            for idx2 in range(idx, len(labels)):        # context['sentence_end']
+            for idx2 in range(idx, len_labels):        # context['sentence_end']
                 end += len(text[idx2])
                 if idx != idx2:
                     entity += " "
@@ -235,7 +231,7 @@ def calc_entity_spans(contexts, id2val):
                     
                     if labels[idx2] == 'O':     # 1, 3
                         label = 'NIL'
-                    elif idx2+1 < context['sentence_end']:
+                    elif idx2+1 < len_labels:
                         if labels[idx2+1] == 'O':       # 2
                             if labels[idx][:2] == 'I-':
                                 label = 'NIL'
@@ -278,7 +274,7 @@ def calc_entity_spans(contexts, id2val):
                         label = 'NIL'
                     elif labels[idx2][:2] == 'I-':
                         label = 'NIL'
-                    elif idx2+1 < context['sentence_end']:                            # sprawdzenie czy nie jest poczatkiem dluzszej encji    
+                    elif idx2+1 < len_labels:                            # sprawdzenie czy nie jest poczatkiem dluzszej encji    
                         if labels[idx2+1][2:] == labels[idx2][2:] and labels[idx2+1][:2] == 'I-':
                             label = 'NIL'
                         else:
@@ -289,7 +285,7 @@ def calc_entity_spans(contexts, id2val):
                 all_context_entities.append(dict(
                     entity_span=(beg, end), 
                     entity_text=entity,
-                    entity_label=label,                 # NIL, bo nie jest wykorzystywane
+                    entity_label=label,                 
                 ))
 
                 
