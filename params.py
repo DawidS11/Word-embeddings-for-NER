@@ -6,7 +6,7 @@ class Params():
         self.val_dataset_size = 0.15
         self.test_dataset_size = 0.15       
 
-        self.we_method = 'roberta' # glove / elmo / bert / roberta / luke
+        self.we_method = 'elmo' # glove / elmo / bert / roberta / luke
         self.nn_method = 'rnn' # rnn / lstm / cnn
         self.dataset_name = 'conll2003' # kaggle / conll2003
 
@@ -49,7 +49,7 @@ class Params():
         self.max_entity_num = 0
         self.vocab_size = 0
 
-        self.max_context_len = 400
+        self.max_context_len = 510  # maksymalny dla bert i roberta to 512 (510 + znaki początku i końca)
         self.pad_word = 'P'
         self.pad_tag = 'O'
         self.pad_tag_num = -1

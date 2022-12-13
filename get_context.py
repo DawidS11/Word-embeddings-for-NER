@@ -22,21 +22,29 @@ def get_context_kaggle(sentences, labels, val2id):
 
 
 def get_context_conll2003(documents, params, val2id):
-    
-    if params.we_method.lower() == 'bert' or params.we_method.lower() == 'glove' or params.we_method.lower() == 'elmo':
+     
+    if params.we_method.lower() == 'bert':
         tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
+        params.max_context_len = 510
     elif params.we_method.lower() == 'roberta':
         tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+        params.max_context_len = 510
     elif params.we_method.lower() == 'luke':
         tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
+        params.max_context_len = 510
+    else:
+        params.max_context_len = 2048                                               # sprawdzić czy na pewno 2048 znaków
     
     contexts = []
-
+    
     for document in documents:
         sentences_flat = sum(document["sentences"], [])
         labels_flat = sum(document["sentences_labels"], [])
         text_labels = [val2id[lab] for lab in labels_flat]
-        subword_lengths = [len(tokenizer.tokenize(w)) for w in sentences_flat]
+        if params.we_method.lower() == 'glove' or params.we_method.lower() == 'elmo':
+            subword_lengths = [len(w) for w in sentences_flat]                          # liczba znaków
+        else:
+            subword_lengths = [len(tokenizer.tokenize(w)) for w in sentences_flat]      # liczba tokenów
         total_subword_length = sum(subword_lengths)
 
         sentence_beg = 0     
@@ -85,6 +93,5 @@ def get_context_conll2003(documents, params, val2id):
                     ))
 
             sentence_beg += len(sen)
-            # sen to lista slow wiec len(sen) to ilosc slow w zdaniu (nie ilosc liter)
             
     return contexts

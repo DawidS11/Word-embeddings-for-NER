@@ -22,11 +22,7 @@ def stats(outputs, labels):
     labels = labels.ravel()         # (1D: batch_size*seq_len)
     mask = (labels >= 0)
     outputs = np.argmax(outputs, axis=1)
-    if(np.sum(mask) == 0):
-        print(labels)
-        print(mask)
-        print(outputs)
-        quit()
+
     accuracy = np.sum(outputs == labels)/float(np.sum(mask))
     labels_not_masked = []
     outputs_not_masked = []
@@ -36,8 +32,6 @@ def stats(outputs, labels):
             outputs_not_masked.append(outputs[i])
 
     f1 = f1_score(labels_not_masked, outputs_not_masked, average='micro')
-    if not f1:
-        f1 = 0.0
 
     if my_params.we_method.lower() == 'luke':
         labels_vals = [id2val_entity[label] if label < my_params.num_of_tags_entity else 'NIL' for label in labels_not_masked]

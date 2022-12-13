@@ -70,13 +70,6 @@ class DatasetLoader(object):
 
         num_batches = (dataset_size + 1) // batch_size
         for i in range(num_batches):
-            # if self.params.we_method == 'elmo':             # Padding w kazdej batch.
-            #     batch_sentences = [data['sentences'][idx] for idx in order[i*batch_size : (i+1)*batch_size]]
-            #     batch_labels = [data['labels'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
-            # else:
-            #     batch_sentences = np.array([data['prepared_context_text'][idx] for idx in order[i*batch_size : (i+1)*batch_size]])
-            #     batch_labels = np.array([data['prepared_context_labels'][idx] for idx in order[i*batch_size:(i+1)*batch_size]])
-
             batch_sentences = [data['sentences'][idx] for idx in order[i*batch_size : (i+1)*batch_size]]
             batch_labels = [data['labels'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
             batch_contexts = [data['contexts'][idx] for idx in order[i*batch_size:(i+1)*batch_size]]
@@ -87,19 +80,24 @@ class DatasetLoader(object):
 def prepare_elmo(params, contexts):
     context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]
     context_labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+    sentence_begs = [contexts[idx]['sentence_beg'] for idx in range(len(contexts))]
+    sentence_ends = [contexts[idx]['sentence_end'] for idx in range(len(contexts))]
+
     max_num = max([len(s) for s in context_labels])
 
-    padded_sentences = pad_sequences([[s for s in sen] for sen in context_texts],
-            maxlen=max_num, value=params.pad_word, padding="post",      
-            dtype=object, truncating="post")
+    # padded_sentences = pad_sequences([[s for s in sen] for sen in context_texts],     # batch_to_ids robi padding
+    #         maxlen=max_num, value=params.pad_word, padding="post",      
+    #         dtype=object, truncating="post")
 
-    padded_sentences = batch_to_ids(padded_sentences)
+    # padded_sentences = batch_to_ids(padded_sentences)
+
+    padded_sentences = batch_to_ids(context_texts)      # robi padding
     
     padded_labels = pad_sequences([[l for l in lab] for lab in context_labels],
         maxlen=max_num, value=params.pad_tag_num, padding="post",       
         dtype="long", truncating="post")
 
-    return padded_sentences, padded_labels
+    return padded_sentences, padded_labels, sentence_begs, sentence_ends
 
 
 def prepare_bert_roberta(params, tokenizer, contexts):
