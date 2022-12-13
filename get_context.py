@@ -85,5 +85,6 @@ def get_context_conll2003(documents, params, val2id):
                     ))
 
             sentence_beg += len(sen)
-
+            # sen to lista slow wiec len(sen) to ilosc slow w zdaniu (nie ilosc liter)
+            
     return contexts

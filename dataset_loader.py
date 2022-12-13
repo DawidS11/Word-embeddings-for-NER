@@ -103,38 +103,53 @@ def prepare_elmo(params, contexts):
 
 
 def prepare_bert_roberta(params, tokenizer, contexts):
-    context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+    context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]         # [ [], [], ...]
     context_labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+    sentence_begs = [contexts[idx]['sentence_beg'] for idx in range(len(contexts))]
+    sentence_ends = [contexts[idx]['sentence_end'] for idx in range(len(contexts))]
 
     tokenized_sentences = []
     tokenized_sen = []
     tokenized_word = []
-    
     tokenized_labels = []
     tokenized_sen_labels = []
-    idx = -1
-    is_first = True
-
+    
+    idx_sen = 0
     for sen, lab in zip(context_texts, context_labels):
-        idx = -1
-        for word in sen:
-            idx += 1
-            tokenized_word = tokenizer.tokenize(word)
+        curr_token = 0
+        beg_updated = False
+        end_updated = False
 
+        for idx_word, word in enumerate(sen):
+
+            tokenized_word = tokenizer.tokenize(word)
             is_first = True
+
+            if idx_word == sentence_begs[idx_sen]:
+                if not beg_updated:
+                    sentence_begs[idx_sen] = curr_token 
+                    beg_updated = True     
+            elif idx_word == sentence_ends[idx_sen]-1:
+                if not end_updated:
+                    sentence_ends[idx_sen] = curr_token+1
+                    end_updated = True
+
             for token in tokenized_word:
                 tokenized_sen.append(token)
+                curr_token += 1 
                 if is_first:
-                    tokenized_sen_labels.append(lab[idx])
+                    tokenized_sen_labels.append(lab[idx_word])
                     is_first = False
                 else:
-                    tokenized_sen_labels.append(params.pad_tag_num)                
+                    tokenized_sen_labels.append(params.pad_tag_num)
 
         tokenized_sentences.append(tokenized_sen)
         tokenized_labels.append(tokenized_sen_labels)
         tokenized_sen = []
         tokenized_sen_labels = []
+        idx_sen += 1
 
+    idx_sen = 0
     if params.we_method == 'bert':
         for sen, lab in zip(tokenized_sentences, tokenized_labels):
             if sen[0] != "[CLS]":
@@ -142,6 +157,9 @@ def prepare_bert_roberta(params, tokenizer, contexts):
                 sen.append("[SEP]")
                 lab.insert(0, params.pad_tag_num)
                 lab.append(params.pad_tag_num)
+                sentence_begs[idx_sen] += 1
+                sentence_ends[idx_sen] += 1
+            idx_sen += 1
 
     else:
         for sen, lab in zip(tokenized_sentences, tokenized_labels):
@@ -150,6 +168,9 @@ def prepare_bert_roberta(params, tokenizer, contexts):
                 sen.append("</s>")
                 lab.insert(0, params.pad_tag_num)
                 lab.append(params.pad_tag_num)
+                sentence_begs[idx_sen] += 1
+                sentence_ends[idx_sen] += 1
+            idx_sen += 1
 
     max_num = max([len(l) for l in tokenized_labels])
 
@@ -160,7 +181,7 @@ def prepare_bert_roberta(params, tokenizer, contexts):
     tokenized_sentences = pad_sequences([tokenizer.convert_tokens_to_ids(sen) for sen in tokenized_sentences],
                         maxlen=max_num, dtype="long", truncating="post", padding="post")
 
-    return tokenized_sentences, tokenized_labels
+    return tokenized_sentences, tokenized_labels, sentence_begs, sentence_ends
 
 
 def prepare_luke(params, contexts, tokenizer, id2val, val2id_entity):

@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings('always')  # "error", "ignore", "always", "default", "module" or "once"
+
 import os
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -19,9 +22,12 @@ def stats(outputs, labels):
     labels = labels.ravel()         # (1D: batch_size*seq_len)
     mask = (labels >= 0)
     outputs = np.argmax(outputs, axis=1)
-    
+    if(np.sum(mask) == 0):
+        print(labels)
+        print(mask)
+        print(outputs)
+        quit()
     accuracy = np.sum(outputs == labels)/float(np.sum(mask))
-
     labels_not_masked = []
     outputs_not_masked = []
     for i in range(len(mask)):
@@ -30,13 +36,15 @@ def stats(outputs, labels):
             outputs_not_masked.append(outputs[i])
 
     f1 = f1_score(labels_not_masked, outputs_not_masked, average='micro')
-    
+    if not f1:
+        f1 = 0.0
+
     if my_params.we_method.lower() == 'luke':
-        labels_vals = [id2val_entity[label] if label < 5 else "NIL" for label in labels_not_masked]
-        outputs_vals = [id2val_entity[output] if output < 5 else "NIL" for output in outputs_not_masked]
+        labels_vals = [id2val_entity[label] if label < my_params.num_of_tags_entity else 'NIL' for label in labels_not_masked]
+        outputs_vals = [id2val_entity[output] if output < my_params.num_of_tags_entity else 'NIL' for output in outputs_not_masked]
     else:
-        labels_vals = [id2val_entity[label] for label in labels_not_masked]
-        outputs_vals = [id2val_entity[output] for output in outputs_not_masked]
+        labels_vals = [id2val[label] if label < my_params.num_of_tags else 'O' for label in labels_not_masked]
+        outputs_vals = [id2val[output] if output < my_params.num_of_tags else 'O' for output in outputs_not_masked]
 
     return accuracy, f1, labels_vals, outputs_vals
 
@@ -63,8 +71,8 @@ def evaluate(model, criterion, data_eval_iterator, num_batches):
     total_loss = 0.0
     total_acc = 0.0
     total_f1_score = 0.0
-    all_labels = []
     all_outputs = []
+    all_labels = []
 
     with torch.no_grad():
         batches = trange(num_batches)
@@ -82,7 +90,7 @@ def evaluate(model, criterion, data_eval_iterator, num_batches):
             labels = labels.data.cpu().numpy()
 
             total_loss += loss.item()
-            acc, f1, labels_vals, outputs_vals = stats(my_params, outputs, labels)
+            acc, f1, labels_vals, outputs_vals = stats(outputs, labels)
             total_acc += acc
             total_f1_score += f1
             all_outputs.append(outputs_vals)

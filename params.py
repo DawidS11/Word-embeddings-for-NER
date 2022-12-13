@@ -6,14 +6,14 @@ class Params():
         self.val_dataset_size = 0.15
         self.test_dataset_size = 0.15       
 
-        self.we_method = 'elmo' # glove / elmo / bert / roberta / luke
+        self.we_method = 'roberta' # glove / elmo / bert / roberta / luke
         self.nn_method = 'rnn' # rnn / lstm / cnn
-        self.dataset_name = 'kaggle' # kaggle / conll2003
+        self.dataset_name = 'conll2003' # kaggle / conll2003
 
         self.device = 'cpu' 
         self.seed = 2022  
 
-        self.num_epochs = 1
+        self.num_epochs = 5
         self.learning_rate = 1e-3
         self.train_batch_size = 4
         self.val_batch_size = 2
@@ -33,6 +33,9 @@ class Params():
         self.data_dir = '/content/'  
         self.glove_dir = '/content/' 
         self.elmo_dir = '/content/' 
+        # self.data_dir = '/'  
+        # self.glove_dir = '/' 
+        # self.elmo_dir = '/' 
 
         self.elmo_options_file = "elmo_2x2048_256_2048cnn_1xhighway_options.json"
         self.elmo_weight_file = "elmo_2x2048_256_2048cnn_1xhighway_weights.hdf5"
@@ -41,6 +44,7 @@ class Params():
         self.val_size = 0
         self.test_size = 0
         self.num_of_tags  = 0
+        self.num_of_tags_entity = 0
         self.max_sen_len = 0
         self.max_entity_num = 0
         self.vocab_size = 0

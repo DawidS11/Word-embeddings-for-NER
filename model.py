@@ -60,6 +60,7 @@ class Model(nn.Module):
             for param in self.embedding.parameters():
                 param.requires_grad = False  
 
+            params.max_sen_len += 2     # "<s>", "</s>"
             params.embedding_dim = params.roberta_dim
 
         elif self.we_method == 'luke':
@@ -125,7 +126,7 @@ class Model(nn.Module):
 
         elif self.we_method == 'bert':
             
-            sentences, labels = prepare_bert_roberta(self.params, self.tokenizer, contexts)
+            sentences, labels, sentence_begs, sentence_ends = prepare_bert_roberta(self.params, self.tokenizer, contexts)
 
             attention_mask = (labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)
@@ -133,14 +134,31 @@ class Model(nn.Module):
 
             inputs = torch.LongTensor(sentences)
             inputs = inputs.to(device=self.params.device)
-      
+
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
             del inputs
+
+            # Bierze pod uwagę tylko zdanie, nie caly kontekst:
+            tmp_x = []
+            sentence_labels = []
+            for i in range(len(sentence_begs)):
+                tmp_x.append(x[i][sentence_begs[i]:sentence_ends[i]])
+                sentence_labels.append((labels[i][sentence_begs[i]:sentence_ends[i]]))         
+            
+            max_num = max([len(a) for a in tmp_x])
+            tmp_x = [F.pad(tensor, pad=(0, 0, 0, max_num - tensor.shape[0])) for tensor in tmp_x]
+            x = torch.stack(tmp_x)
+
+            max_num = max([len(l) for l in sentence_labels])
+            labels = pad_sequences([[l for l in lab] for lab in sentence_labels],
+                maxlen=max_num, value=self.params.pad_tag_num, padding="post",       
+                dtype="long", truncating="post")
+            labels = np.array(labels)
             
 
         elif self.we_method == 'roberta':
 
-            sentences, labels = prepare_bert_roberta(self.params, self.tokenizer, contexts)
+            sentences, labels, sentence_begs, sentence_ends = prepare_bert_roberta(self.params, self.tokenizer, contexts)
             
             attention_mask = (labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)
@@ -151,6 +169,23 @@ class Model(nn.Module):
 
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
             del inputs
+
+            # Bierze pod uwagę tylko zdanie, nie caly kontekst:
+            tmp_x = []
+            sentence_labels = []
+            for i in range(len(sentence_begs)):
+                tmp_x.append(x[i][sentence_begs[i]:sentence_ends[i]])
+                sentence_labels.append((labels[i][sentence_begs[i]:sentence_ends[i]]))         
+            
+            max_num = max([len(a) for a in tmp_x])
+            tmp_x = [F.pad(tensor, pad=(0, 0, 0, max_num - tensor.shape[0])) for tensor in tmp_x]
+            x = torch.stack(tmp_x)
+
+            max_num = max([len(l) for l in sentence_labels])
+            labels = pad_sequences([[l for l in lab] for lab in sentence_labels],
+                maxlen=max_num, value=self.params.pad_tag_num, padding="post",       
+                dtype="long", truncating="post")
+            labels = np.array(labels)
 
 
         elif self.we_method == 'luke':
