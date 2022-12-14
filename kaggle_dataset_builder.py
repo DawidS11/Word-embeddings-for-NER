@@ -31,7 +31,10 @@ class KaggleDataset(object):
         
         print("Init KaggleDataset")
 
-        dataset_path = os.path.join(params.data_dir, 'ner_dataset_small.csv')       # ner_dataset
+        if params.dataset_name == 'kaggle':
+            dataset_path = os.path.join(params.data_dir, 'ner_dataset.csv')
+        else:
+            dataset_path = os.path.join(params.data_dir, 'ner_dataset_small.csv')
         error_msg = "{} file not found. ".format(dataset_path)
         assert os.path.isfile(dataset_path), error_msg
         self.words = Counter()

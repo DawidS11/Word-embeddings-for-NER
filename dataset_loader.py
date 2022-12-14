@@ -13,7 +13,7 @@ class DatasetLoader(object):
         
         self.params = params
 
-        if params.dataset_name == "kaggle":
+        if params.dataset_name == "kaggle" or params.dataset_name == "kaggle_small":
             self.dataset = KaggleDataset(params)  
         elif params.dataset_name == "conll2003":
             self.dataset = Conll2003Dataset(params) 

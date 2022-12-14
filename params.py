@@ -6,14 +6,14 @@ class Params():
         self.val_dataset_size = 0.15
         self.test_dataset_size = 0.15       
 
-        self.we_method = 'elmo' # glove / elmo / bert / roberta / luke
-        self.nn_method = 'rnn' # rnn / lstm / cnn
-        self.dataset_name = 'conll2003' # kaggle / conll2003
+        self.we_method = 'bert' # glove / elmo / bert / roberta / luke
+        self.nn_method = 'cnn' # rnn / lstm / cnn
+        self.dataset_name = 'kaggle_small' # kaggle / conll2003 / kaggle_small
 
         self.device = 'cpu' 
         self.seed = 2022  
 
-        self.num_epochs = 5
+        self.num_epochs = 1
         self.learning_rate = 1e-3
         self.train_batch_size = 4
         self.val_batch_size = 2

@@ -78,14 +78,25 @@ class Model(nn.Module):
         self.nn_method = params.nn_method.lower()
         if self.nn_method == 'lstm':
             self.lstm = nn.LSTM(params.embedding_dim, params.hidden_dim, batch_first=True)
-            self.fc = nn.Linear(params.hidden_dim, params.num_of_tags)
 
         elif self.nn_method == 'rnn':
             self.rnn = nn.RNN(params.embedding_dim, params.hidden_dim, batch_first=True)
-            self.fc = nn.Linear(params.hidden_dim, params.num_of_tags)
+
+        elif self.nn_method == 'cnn':
+            self.conv = nn.Conv2d(1, params.hidden_dim, kernel_size=(1, params.embedding_dim))
+            nn.init.xavier_uniform_(self.conv.weight)
+            nn.init.constant_(self.conv.bias, 0.0)
 
         else:
             print("init: nn_method nie zostala wybrana. ")
+
+        if self.we_method == 'luke':
+            self.fc = nn.Linear(params.hidden_dim, params.num_of_tags_entity)
+        else:
+            self.fc = nn.Linear(params.hidden_dim, params.num_of_tags)
+        nn.init.uniform_(self.fc.weight, -0.5, 0.5)
+        nn.init.uniform_(self.fc.bias, -0.1, 0.1)
+
 
     def forward(self, sentences, labels, contexts):
         
@@ -159,16 +170,15 @@ class Model(nn.Module):
                 tmp_x.append(x[i][sentence_begs[i]:sentence_ends[i]])
                 sentence_labels.append((labels[i][sentence_begs[i]:sentence_ends[i]]))         
             
-            max_num = max([len(a) for a in tmp_x])
+            max_num = max([len(l) for l in sentence_labels])
             tmp_x = [F.pad(tensor, pad=(0, 0, 0, max_num - tensor.shape[0])) for tensor in tmp_x]
             x = torch.stack(tmp_x)
 
-            max_num = max([len(l) for l in sentence_labels])
             labels = pad_sequences([[l for l in lab] for lab in sentence_labels],
                 maxlen=max_num, value=self.params.pad_tag_num, padding="post",       
                 dtype="long", truncating="post")
             labels = np.array(labels)
-            
+
 
         elif self.we_method == 'roberta':
 
@@ -191,11 +201,10 @@ class Model(nn.Module):
                 tmp_x.append(x[i][sentence_begs[i]:sentence_ends[i]])
                 sentence_labels.append((labels[i][sentence_begs[i]:sentence_ends[i]]))         
             
-            max_num = max([len(a) for a in tmp_x])
+            max_num = max([len(l) for l in sentence_labels])
             tmp_x = [F.pad(tensor, pad=(0, 0, 0, max_num - tensor.shape[0])) for tensor in tmp_x]
             x = torch.stack(tmp_x)
 
-            max_num = max([len(l) for l in sentence_labels])
             labels = pad_sequences([[l for l in lab] for lab in sentence_labels],
                 maxlen=max_num, value=self.params.pad_tag_num, padding="post",       
                 dtype="long", truncating="post")
@@ -221,6 +230,17 @@ class Model(nn.Module):
 
         elif self.nn_method == 'rnn':
             x, _ = self.rnn(x)
+        
+        elif self.nn_method == 'cnn':
+            # print(x.shape)
+            x = x.unsqueeze(1)
+            # print(x.shape)
+            x = F.relu(self.conv(x).squeeze(3))
+            #x = self.conv(x).squeeze(3)
+            # print(x.shape)
+            x = x.permute(0, 2, 1)
+            # print(x.shape)              # [4, 37, 100])
+            # quit()
 
         else:
             print("forward: nn_method nie zostala wybrana")
