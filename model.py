@@ -232,15 +232,9 @@ class Model(nn.Module):
             x, _ = self.rnn(x)
         
         elif self.nn_method == 'cnn':
-            # print(x.shape)
             x = x.unsqueeze(1)
-            # print(x.shape)
             x = F.relu(self.conv(x).squeeze(3))
-            #x = self.conv(x).squeeze(3)
-            # print(x.shape)
             x = x.permute(0, 2, 1)
-            # print(x.shape)              # [4, 37, 100])
-            # quit()
 
         else:
             print("forward: nn_method nie zostala wybrana")

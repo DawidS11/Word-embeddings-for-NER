@@ -1,5 +1,5 @@
 import warnings
-warnings.filterwarnings('always')  # "error", "ignore", "always", "default", "module" or "once"
+warnings.filterwarnings('ignore')  # "error", "ignore", "always", "default", "module" or "once"
 
 import os
 
@@ -13,7 +13,7 @@ import time
 
 from model import Model
 from dataset_loader import DatasetLoader
-from sklearn.metrics import f1_score, classification_report
+import sklearn.metrics
 import seqeval.metrics
 import params
 
@@ -31,7 +31,7 @@ def stats(outputs, labels):
             labels_not_masked.append(labels[i])
             outputs_not_masked.append(outputs[i])
 
-    f1 = f1_score(labels_not_masked, outputs_not_masked, average='micro')
+    f1 = sklearn.metrics.f1_score(labels_not_masked, outputs_not_masked, average='micro')
 
     if my_params.we_method.lower() == 'luke':
         labels_vals = [id2val_entity[label] if label < my_params.num_of_tags_entity else 'NIL' for label in labels_not_masked]
@@ -92,7 +92,15 @@ def evaluate(model, criterion, data_eval_iterator, num_batches):
 
     flat_labels = [item for sublist in all_labels for item in sublist]
     flat_outputs = [item for sublist in all_outputs for item in sublist]
-    print("\nEvaluation table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
+    if my_params.we_method.lower() == 'luke':
+        print("\nEvaluation table: \n\n", sklearn.metrics.classification_report(flat_labels, flat_outputs, digits=4))
+        print("\nEvaluation accuracy: ", sklearn.metrics.accuracy_score(flat_labels, flat_outputs))
+        print("Evaluation f1_score micro: ", sklearn.metrics.f1_score(flat_labels, flat_outputs, average='micro'), "\n")
+    else:
+        print("\nEvaluation table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
+        print("\nEvaluation accuracy: ", seqeval.metrics.accuracy_score([flat_labels], [flat_outputs]))
+        print("Evaluation f1_score micro: ", seqeval.metrics.f1_score([flat_labels], [flat_outputs]), "\n")
+       
     avg_loss = total_loss / num_batches
     avg_acc = total_acc / num_batches
     avg_f1_score = total_f1_score / num_batches
@@ -139,7 +147,15 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches):
 
     flat_labels = [item for sublist in all_labels for item in sublist]
     flat_outputs = [item for sublist in all_outputs for item in sublist]
-    print("\nTraining table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
+    if my_params.we_method.lower() == 'luke':
+        print("\nTraining table: \n\n", sklearn.metrics.classification_report(flat_labels, flat_outputs, digits=4))
+        print("\nTraining accuracy: ", sklearn.metrics.accuracy_score(flat_labels, flat_outputs))
+        print("Training f1_score micro: ", sklearn.metrics.f1_score(flat_labels, flat_outputs, average='micro'), "\n")
+    else:
+        print("\nTraining table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
+        print("\nTraining accuracy: ", seqeval.metrics.accuracy_score([flat_labels], [flat_outputs]))
+        print("Training f1_score micro: ", seqeval.metrics.f1_score([flat_labels], [flat_outputs]), "\n")
+        
     avg_loss = total_loss / num_batches
     avg_acc = total_acc / num_batches
     avg_f1_score = total_f1_score / num_batches
