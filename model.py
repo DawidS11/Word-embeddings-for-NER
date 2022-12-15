@@ -9,7 +9,7 @@ from transformers import RobertaTokenizer, RobertaModel
 from transformers import LukeTokenizer, LukeModel
 from keras_preprocessing.sequence import pad_sequences
 
-from dataset_loader import prepare_elmo, prepare_bert_roberta, prepare_luke
+from dataset_loader import prepare_glove, prepare_elmo, prepare_bert_roberta, prepare_luke
 
 class Model(nn.Module):
 
@@ -110,26 +110,47 @@ class Model(nn.Module):
     def forward(self, sentences, labels, contexts):
         
         if self.we_method == "glove":
-            sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
-            labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
-            max_num = max([len(s) for s in sentences])
 
-            max_len = max(map(lambda x: len(x), sentences), default=0)                                   
-            sentences = list(map(lambda x: list(map(lambda w: self.word2id.get(w, 0), x)), sentences))
-            sentences = list(map(lambda x: x + [self.params.vocab_size-1] * (max_len - len(x)), sentences))
+            sentences, labels, sentence_begs, sentence_ends = prepare_glove(self.params, self.word2id, contexts)
 
-            sentences = pad_sequences([[w for w in sen] for sen in sentences],
-                          maxlen=max_num, dtype="long", truncating="post", padding="post")
+            # sentences = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+            # labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+            # max_num = max([len(s) for s in sentences])
 
-            labels = pad_sequences([[l for l in lab] for lab in labels],
-                maxlen=max_num, value=self.params.pad_tag_num, padding="post",      
+            # max_len = max(map(lambda x: len(x), sentences), default=0)                                   
+            # sentences = list(map(lambda x: list(map(lambda w: self.word2id.get(w, 0), x)), sentences))
+            # sentences = list(map(lambda x: x + [self.params.vocab_size-1] * (max_len - len(x)), sentences))
+
+            # sentences = pad_sequences([[w for w in sen] for sen in sentences],
+            #               maxlen=max_num, dtype="long", truncating="post", padding="post")
+
+            # labels = pad_sequences([[l for l in lab] for lab in labels],
+            #     maxlen=max_num, value=self.params.pad_tag_num, padding="post",      
+            #     dtype="long", truncating="post")
+
+            inputs = torch.LongTensor(sentences)
+            inputs = inputs.to(device=self.params.device)
+
+            x = self.embedding(inputs)
+            del inputs
+
+            # Bierze pod uwagę tylko zdanie, nie caly kontekst:
+            tmp_x = []
+            sentence_labels = []
+            for i in range(len(sentence_begs)):
+                tmp_x.append(x[i][sentence_begs[i]:sentence_ends[i]])
+                sentence_labels.append((labels[i][sentence_begs[i]:sentence_ends[i]]))         
+            
+            max_num = max([len(a) for a in tmp_x])
+            tmp_x = [F.pad(tensor, pad=(0, 0, 0, max_num - tensor.shape[0])) for tensor in tmp_x]
+            x = torch.stack(tmp_x)
+
+            max_num = max([len(l) for l in sentence_labels])
+            labels = pad_sequences([[l for l in lab] for lab in sentence_labels],
+                maxlen=max_num, value=self.params.pad_tag_num, padding="post",       
                 dtype="long", truncating="post")
-
-            sentences = torch.LongTensor(sentences)
-            sentences = sentences.to(device=self.params.device)
-
-            x = self.embedding(sentences)
-        
+            labels = np.array(labels)
+            
 
         elif self.we_method == 'elmo':
 

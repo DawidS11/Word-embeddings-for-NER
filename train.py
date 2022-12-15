@@ -121,6 +121,7 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, show_table):
             print("\nEvaluation table: \n\n", sklearn.metrics.classification_report(flat_labels, flat_outputs, digits=4, labels=labels_without_O))
             #print("Evaluation accuracy: ", sklearn.metrics.accuracy_score(flat_labels, flat_outputs, labels=labels_without_O))
             print("Evaluation f1_score micro: ", sklearn.metrics.f1_score(flat_labels, flat_outputs, average='micro', labels=labels_without_O), "\n\n")
+            
             print("\nEvaluation table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
             print("Evaluation accuracy: ", seqeval.metrics.accuracy_score([flat_labels], [flat_outputs]))
             print("Evaluation f1_score micro: ", seqeval.metrics.f1_score([flat_labels], [flat_outputs]), "\n")

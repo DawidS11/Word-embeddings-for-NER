@@ -77,6 +77,28 @@ class DatasetLoader(object):
             yield batch_sentences, batch_labels, batch_contexts
 
 
+def prepare_glove(params, word2id, contexts):
+    context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]
+    context_labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
+    sentence_begs = [contexts[idx]['sentence_beg'] for idx in range(len(contexts))]
+    sentence_ends = [contexts[idx]['sentence_end'] for idx in range(len(contexts))]
+
+    max_len = max(map(lambda x: len(x), context_texts), default=0)                                   
+    context_texts = list(map(lambda x: list(map(lambda w: word2id.get(w, 0), x)), context_texts))
+    context_texts = list(map(lambda x: x + [params.vocab_size-1] * (max_len - len(x)), context_texts))
+
+    max_num = max([len(s) for s in context_labels])
+
+    padded_sentences = pad_sequences([[w for w in sen] for sen in context_texts],
+        maxlen=max_num, dtype="long", truncating="post", padding="post")
+
+    padded_labels = pad_sequences([[l for l in lab] for lab in context_labels],
+        maxlen=max_num, value=params.pad_tag_num, padding="post",      
+        dtype="long", truncating="post")
+
+    return padded_sentences, padded_labels, sentence_begs, sentence_ends
+
+
 def prepare_elmo(params, contexts):
     context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]
     context_labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
