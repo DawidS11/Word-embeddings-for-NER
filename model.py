@@ -43,14 +43,23 @@ class Model(nn.Module):
 
             params.embedding_dim = params.elmo_dim
 
-        elif self.we_method == 'bert':
+        elif self.we_method == 'bert_base':
             self.embedding = BertModel.from_pretrained("bert-base-cased")
             self.tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
 
             for param in self.embedding.parameters():
                 param.requires_grad = False                 
 
-            params.embedding_dim = params.bert_dim
+            params.embedding_dim = params.bert_base_dim
+        
+        elif self.we_method == 'bert_large':
+            self.embedding = BertModel.from_pretrained("bert-large-cased")
+            self.tokenizer = BertTokenizer.from_pretrained("bert-large-cased")
+
+            for param in self.embedding.parameters():
+                param.requires_grad = False                 
+
+            params.embedding_dim = params.bert_large_dim
 
         elif self.we_method == 'roberta':
             self.embedding = RobertaModel.from_pretrained("roberta-base")
@@ -149,7 +158,7 @@ class Model(nn.Module):
                 dtype="long", truncating="post")
             labels = np.array(labels)
 
-        elif self.we_method == 'bert':
+        elif self.we_method == 'bert_base' or self.we_method == 'bert_large':
             
             sentences, labels, sentence_begs, sentence_ends = prepare_bert_roberta(self.params, self.tokenizer, contexts)
 

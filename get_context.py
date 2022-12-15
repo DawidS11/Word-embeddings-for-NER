@@ -23,8 +23,11 @@ def get_context_kaggle(sentences, labels, val2id):
 
 def get_context_conll2003(documents, params, val2id):
      
-    if params.we_method.lower() == 'bert':
+    if params.we_method.lower() == 'bert_base':
         tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
+        params.max_context_len = 510
+    elif params.we_method.lower() == 'bert_large':
+        tokenizer = BertTokenizer.from_pretrained("bert-large-cased")
         params.max_context_len = 510
     elif params.we_method.lower() == 'roberta':
         tokenizer = RobertaTokenizer.from_pretrained("roberta-base")

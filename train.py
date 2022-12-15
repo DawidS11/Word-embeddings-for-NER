@@ -59,7 +59,7 @@ def loss_fun(outputs, labels):
     return -torch.sum(outputs[range(outputs.shape[0]), labels]*mask)/num_tokens
 
 
-def evaluate(model, criterion, data_eval_iterator, num_batches):
+def evaluate(model, criterion, data_eval_iterator, num_batches, show_table):
     
     model.eval()
     total_loss = 0.0
@@ -92,14 +92,38 @@ def evaluate(model, criterion, data_eval_iterator, num_batches):
 
     flat_labels = [item for sublist in all_labels for item in sublist]
     flat_outputs = [item for sublist in all_outputs for item in sublist]
-    if my_params.we_method.lower() == 'luke':
-        print("\nEvaluation table: \n\n", sklearn.metrics.classification_report(flat_labels, flat_outputs, digits=4))
-        print("\nEvaluation accuracy: ", sklearn.metrics.accuracy_score(flat_labels, flat_outputs))
-        print("Evaluation f1_score micro: ", sklearn.metrics.f1_score(flat_labels, flat_outputs, average='micro'), "\n")
-    else:
-        print("\nEvaluation table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
-        print("\nEvaluation accuracy: ", seqeval.metrics.accuracy_score([flat_labels], [flat_outputs]))
-        print("Evaluation f1_score micro: ", seqeval.metrics.f1_score([flat_labels], [flat_outputs]), "\n")
+
+    if show_table:
+        if my_params.we_method.lower() == 'luke':
+            x = []
+            y = []
+            for i in range(len(flat_labels)):
+                if flat_labels[i] == 'NIL':
+                    x.append('O')
+                else:
+                    x.append('B-' + flat_labels[i])
+
+                if flat_outputs[i] == 'NIL':
+                    y.append('O')
+                else:
+                    y.append('B-' + flat_outputs[i])
+            
+            print("\nEvaluation table: \n\n", seqeval.metrics.classification_report([x], [y], digits=4))
+            print("Evaluation accuracy: ", seqeval.metrics.accuracy_score([x], [y]))
+            print("Evaluation f1_score micro: ", seqeval.metrics.f1_score([x], [y]), "\n")
+
+            # labels_without_NIL = [l for l in val2id.keys() if l != 'NIL']
+            # print("\nEvaluation table: \n\n", sklearn.metrics.classification_report(flat_labels, flat_outputs, digits=4, labels=labels_without_NIL))
+            # #print("\nEvaluation accuracy: ", sklearn.metrics.accuracy_score(flat_labels, flat_outputs, labels=labels_without_NIL))
+            # print("Evaluation f1_score micro: ", sklearn.metrics.f1_score(flat_labels, flat_outputs, average='micro', labels=labels_without_NIL), "\n")
+        else:
+            labels_without_O = [l for l in val2id.keys() if l != 'O']
+            print("\nEvaluation table: \n\n", sklearn.metrics.classification_report(flat_labels, flat_outputs, digits=4, labels=labels_without_O))
+            #print("Evaluation accuracy: ", sklearn.metrics.accuracy_score(flat_labels, flat_outputs, labels=labels_without_O))
+            print("Evaluation f1_score micro: ", sklearn.metrics.f1_score(flat_labels, flat_outputs, average='micro', labels=labels_without_O), "\n\n")
+            print("\nEvaluation table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
+            print("Evaluation accuracy: ", seqeval.metrics.accuracy_score([flat_labels], [flat_outputs]))
+            print("Evaluation f1_score micro: ", seqeval.metrics.f1_score([flat_labels], [flat_outputs]), "\n")
        
     avg_loss = total_loss / num_batches
     avg_acc = total_acc / num_batches
@@ -145,16 +169,16 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches):
 
         batches.set_postfix(accuracy='{:05.3f}'.format(total_acc/(batch+1)), loss='{:05.3f}'.format(total_loss/(batch+1)))
 
-    flat_labels = [item for sublist in all_labels for item in sublist]
-    flat_outputs = [item for sublist in all_outputs for item in sublist]
-    if my_params.we_method.lower() == 'luke':
-        print("\nTraining table: \n\n", sklearn.metrics.classification_report(flat_labels, flat_outputs, digits=4))
-        print("\nTraining accuracy: ", sklearn.metrics.accuracy_score(flat_labels, flat_outputs))
-        print("Training f1_score micro: ", sklearn.metrics.f1_score(flat_labels, flat_outputs, average='micro'), "\n")
-    else:
-        print("\nTraining table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
-        print("\nTraining accuracy: ", seqeval.metrics.accuracy_score([flat_labels], [flat_outputs]))
-        print("Training f1_score micro: ", seqeval.metrics.f1_score([flat_labels], [flat_outputs]), "\n")
+    # flat_labels = [item for sublist in all_labels for item in sublist]
+    # flat_outputs = [item for sublist in all_outputs for item in sublist]
+    # if my_params.we_method.lower() == 'luke':
+    #     print("\nTraining table: \n\n", sklearn.metrics.classification_report(flat_labels, flat_outputs, digits=4))
+    #     print("\nTraining accuracy: ", sklearn.metrics.accuracy_score(flat_labels, flat_outputs))
+    #     print("Training f1_score micro: ", sklearn.metrics.f1_score(flat_labels, flat_outputs, average='micro'), "\n")
+    # else:
+    #     print("\nTraining table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
+    #     print("\nTraining accuracy: ", seqeval.metrics.accuracy_score([flat_labels], [flat_outputs]))
+    #     print("Training f1_score micro: ", seqeval.metrics.f1_score([flat_labels], [flat_outputs]), "\n")
         
     avg_loss = total_loss / num_batches
     avg_acc = total_acc / num_batches
@@ -219,7 +243,7 @@ if __name__ == '__main__':
         # Validation:
         num_batches = (my_params.val_size + 1) // my_params.val_batch_size
         data_val_iterator = dataset_loader.data_iterator(data_val, my_params.val_size, my_params.val_batch_size, my_params, shuffle=False)
-        avg_loss, avg_acc, avg_f1_score = evaluate(model, criterion, data_val_iterator, num_batches)
+        avg_loss, avg_acc, avg_f1_score = evaluate(model, criterion, data_val_iterator, num_batches, False)
 
         end_val_time = time.time()
         val_time = end_val_time - end_train_time
@@ -248,7 +272,7 @@ if __name__ == '__main__':
     start_test_time = time.time()
     num_batches = (my_params.test_size + 1) // my_params.val_batch_size
     data_test_iterator = dataset_loader.data_iterator(data_test, my_params.test_size, my_params.val_batch_size, my_params, shuffle=False)
-    avg_loss, avg_acc, avg_f1_score = evaluate(model, criterion, data_test_iterator, num_batches)
+    avg_loss, avg_acc, avg_f1_score = evaluate(model, criterion, data_test_iterator, num_batches, True)
     end_test_time = time.time()
     test_time = start_test_time - end_test_time
     total_time += test_time

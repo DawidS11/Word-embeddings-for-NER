@@ -148,7 +148,7 @@ def prepare_bert_roberta(params, tokenizer, contexts):
         idx_sen += 1
 
     idx_sen = 0
-    if params.we_method == 'bert':
+    if params.we_method == 'bert_base' or params.we_method == 'bert_large':
         for sen, lab in zip(tokenized_sentences, tokenized_labels):
             if sen[0] != "[CLS]":
                 sen.insert(0, "[CLS]")
