@@ -24,19 +24,25 @@ def get_context_kaggle(sentences, labels, val2id):
 def get_context_conll2003(documents, params, val2id):
      
     if params.we_method.lower() == 'bert_base':
-        tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
+        if params.bert_cased:
+            tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
+        else:
+            tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         params.max_context_len = 510
     elif params.we_method.lower() == 'bert_large':
-        tokenizer = BertTokenizer.from_pretrained("bert-large-cased")
+        if params.bert_cased:
+            tokenizer = BertTokenizer.from_pretrained("bert-large-cased")
+        else:
+            tokenizer = BertTokenizer.from_pretrained("bert-large-uncased")
         params.max_context_len = 510
     elif params.we_method.lower() == 'roberta':
         tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
         params.max_context_len = 510
     elif params.we_method.lower() == 'luke':
         tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
-        params.max_context_len = 510
+        params.max_context_len = 510 - 7
     else:
-        params.max_context_len = 2048                                               # sprawdzić czy na pewno 2048 znaków
+        params.max_context_len = 2048                                              
     
     contexts = []
     
@@ -52,9 +58,9 @@ def get_context_conll2003(documents, params, val2id):
 
         sentence_beg = 0     
         sentence_end = 0
-        for sen, lab in zip(document["sentences"], document["sentences_labels"]):
+        for sen, lab in zip(document["sentences"], document["sentences_labels"]):           # sen - lista słów
             lab = [val2id[l] for l in lab]
-            sentence_end += len(sen)
+            sentence_end += len(sen)                        
             if not sen:
                 continue
             if total_subword_length <= params.max_context_len:
@@ -72,6 +78,7 @@ def get_context_conll2003(documents, params, val2id):
                 context_beg = sentence_beg
                 context_end = sentence_end
                 cur_length = sum(subword_lengths[context_beg:context_end])
+
                 while True:
                     if context_beg > 0:
                         if cur_length + subword_lengths[context_beg - 1] <= params.max_context_len:
@@ -92,9 +99,9 @@ def get_context_conll2003(documents, params, val2id):
                         context_text=sentences_flat[context_beg:context_end],
                         context_labels=text_labels[context_beg:context_end],
                         sentence_beg=sentence_beg-context_beg,                  # -context_beg zeby wskazac poczatek zdania w context_text
-                        sentence_end=sentence_end-context_beg,
+                        sentence_end=sentence_end-context_beg,                 
                     ))
 
-            sentence_beg += len(sen)
+            sentence_beg += len(sen)            # liczba słów, nie znaków
             
     return contexts

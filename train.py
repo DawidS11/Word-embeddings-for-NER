@@ -188,10 +188,11 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches):
     return avg_loss, avg_acc, avg_f1_score
 
 
-
 if __name__ == '__main__':
     print("train start")
     my_params = params.Params()
+
+    print(my_params.we_method, " ", my_params.bert_cased)
 
     torch.manual_seed(my_params.seed)
     if torch.cuda.is_available():

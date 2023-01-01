@@ -245,21 +245,24 @@ def calc_entity_spans(contexts, id2val):
         end = 0
         text = context['context_text']
         #labels = context['labels']
-        labels = [id2val[l] for l in context['labels']]
+        #labels = [id2val[l] for l in context['labels']] 
+        labels = [id2val[l] for l in context['context_labels']] 
         len_labels = len(labels)
 
         for i in range(context['sentence_beg']):            # przesuniecie beg na poczatek zdania w calym tekscie
-            beg += len(text[i])
+            beg += len(text[i])                     # lista słów
             
-        # for idx in range(context['sentence_beg'], context['sentence_end']):
-        for idx in range(len_labels):
+        for idx in range(context['sentence_beg'], context['sentence_end']):
+        #for idx in range(len_labels):
             end = beg
             entity = text[idx]
 
-            for idx2 in range(idx, len_labels):        # context['sentence_end']
+            #for idx2 in range(idx, len_labels):        # context['sentence_end']
+            for idx2 in range(idx, context['sentence_end']):
                 end += len(text[idx2])
                 if idx != idx2:
                     entity += " "
+                    end += 1
                     entity += text[idx2]
 
                     # przypadki:
@@ -330,7 +333,7 @@ def calc_entity_spans(contexts, id2val):
                 ))
 
                 
-            beg += len(text[idx])
+            beg += len(text[idx]) + 1
 
         all_entities.append(all_context_entities)
         all_context_entities = []

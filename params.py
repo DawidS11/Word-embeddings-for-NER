@@ -7,6 +7,7 @@ class Params():
         self.test_dataset_size = 0.15       
 
         self.we_method = 'bert_large' # glove / elmo / bert_base / bert_large / roberta / luke
+        self.bert_cased = True
         self.nn_method = 'lstm' # rnn / lstm / cnn
         self.dataset_name = 'kaggle' # kaggle / conll2003 / kaggle_small
 

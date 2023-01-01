@@ -44,8 +44,12 @@ class Model(nn.Module):
             params.embedding_dim = params.elmo_dim
 
         elif self.we_method == 'bert_base':
-            self.embedding = BertModel.from_pretrained("bert-base-cased")
-            self.tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
+            if params.bert_cased:
+                self.embedding = BertModel.from_pretrained("bert-base-cased")
+                self.tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
+            else:
+                self.embedding = BertModel.from_pretrained("bert-base-uncased")
+                self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
             for param in self.embedding.parameters():
                 param.requires_grad = False                 
@@ -53,8 +57,12 @@ class Model(nn.Module):
             params.embedding_dim = params.bert_base_dim
         
         elif self.we_method == 'bert_large':
-            self.embedding = BertModel.from_pretrained("bert-large-cased")
-            self.tokenizer = BertTokenizer.from_pretrained("bert-large-cased")
+            if params.bert_cased:
+                self.embedding = BertModel.from_pretrained("bert-large-cased")
+                self.tokenizer = BertTokenizer.from_pretrained("bert-large-cased")
+            else:
+                self.embedding = BertModel.from_pretrained("bert-large-uncased")
+                self.tokenizer = BertTokenizer.from_pretrained("bert-large-uncased")
 
             for param in self.embedding.parameters():
                 param.requires_grad = False                 
@@ -169,6 +177,7 @@ class Model(nn.Module):
                 tmp_x.append(x[i][sentence_begs[i]:sentence_ends[i]])
                 sentence_labels.append((labels[i][sentence_begs[i]:sentence_ends[i]]))         
             
+            print(sentence_begs[i], "  ", sentence_ends[i])
             max_num = max([len(a) for a in tmp_x])
             tmp_x = [F.pad(tensor, pad=(0, 0, 0, max_num - tensor.shape[0])) for tensor in tmp_x]
             x = torch.stack(tmp_x)
