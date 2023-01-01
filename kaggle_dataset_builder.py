@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 from collections import Counter
+import random
 
 from get_glove import get_glove, create_vocab
 from get_context import get_context_kaggle
@@ -46,6 +47,7 @@ class KaggleDataset(object):
 
         self.dataset_sentences = [" ".join([s[0] for s in sent]) for sent in sentences.sentences]
 
+        random.shuffle(sentences.sentences)
         self.dataset_sentences = [[s[0] for s in sen] for sen in sentences.sentences]
         self.dataset_labels  = [[s[2] for s in sen] for sen in sentences.sentences]
         
