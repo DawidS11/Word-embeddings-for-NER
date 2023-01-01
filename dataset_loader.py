@@ -275,7 +275,7 @@ def calc_entity_spans(contexts, id2val):
                     
                     if labels[idx2] == 'O':     # 1, 3
                         label = 'NIL'
-                    elif idx2+1 < len_labels:
+                    elif idx2+1 < context['sentence_end']:          #len_labels:
                         if labels[idx2+1] == 'O':       # 2
                             if labels[idx][:2] == 'I-':
                                 label = 'NIL'
@@ -318,7 +318,7 @@ def calc_entity_spans(contexts, id2val):
                         label = 'NIL'
                     elif labels[idx2][:2] == 'I-':
                         label = 'NIL'
-                    elif idx2+1 < len_labels:                            # sprawdzenie czy nie jest poczatkiem dluzszej encji    
+                    elif idx2+1 < context['sentence_end']:          #len_labels:                            # sprawdzenie czy nie jest poczatkiem dluzszej encji    
                         if labels[idx2+1][2:] == labels[idx2][2:] and labels[idx2+1][:2] == 'I-':
                             label = 'NIL'
                         else:
