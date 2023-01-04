@@ -265,7 +265,7 @@ if __name__ == '__main__':
             best_f1_epoch = epoch
 
     print("\nBest accuracy: {:05.3f} for epoch number {} with the loss: {:05.3f}".format(best_acc, best_epoch+1, best_epoch_loss))
-    print("\nBest f1 score: {:05.3f} for epoch number {}".format(best_f1_score, best_f1_epoch))
+    print("\nBest f1 score: {:05.3f} for epoch number {}".format(best_f1_score, best_f1_epoch+1))
 
     
     print("\n\nTesting...")

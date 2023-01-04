@@ -178,7 +178,7 @@ def prepare_bert_roberta(params, tokenizer, contexts):
                 lab.insert(0, params.pad_tag_num)
                 lab.append(params.pad_tag_num)
                 sentence_begs[idx_sen] += 1
-                sentence_ends[idx_sen] += 1
+                sentence_ends[idx_sen] += 2
             idx_sen += 1
 
     else:
@@ -189,7 +189,7 @@ def prepare_bert_roberta(params, tokenizer, contexts):
                 lab.insert(0, params.pad_tag_num)
                 lab.append(params.pad_tag_num)
                 sentence_begs[idx_sen] += 1
-                sentence_ends[idx_sen] += 1
+                sentence_ends[idx_sen] += 2
             idx_sen += 1
 
     max_num = max([len(l) for l in tokenized_labels])
