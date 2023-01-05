@@ -40,7 +40,7 @@ def stats(outputs, labels):
     else:
         labels_vals = [id2val[label] if label < my_params.num_of_tags else 'O' for label in labels_not_masked]
         outputs_vals = [id2val[output] if output < my_params.num_of_tags else 'O' for output in outputs_not_masked]
-
+        
     return accuracy, f1, labels_vals, outputs_vals
 
 
@@ -89,7 +89,8 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, show_table):
             total_acc += acc
             total_f1_score += f1
             all_outputs.append(outputs_vals)
-            all_labels.append(labels_vals) 
+            all_labels.append(labels_vals)
+
 
     flat_labels = [item for sublist in all_labels for item in sublist]
     flat_outputs = [item for sublist in all_outputs for item in sublist]

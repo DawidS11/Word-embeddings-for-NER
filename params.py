@@ -23,8 +23,8 @@ class Params():
 
         self.embedding_dim = 100     
         self.hidden_dim = 100   
-        self.glove_dim = 50
-        self.elmo_dim = 256
+        self.glove_dim = 300
+        self.elmo_dim = 512
         self.bert_base_dim = 768 
         self.bert_large_dim = 1024
         self.roberta_dim = 768       

@@ -174,7 +174,6 @@ class Model(nn.Module):
                 tmp_x.append(x[i][sentence_begs[i]:sentence_ends[i]])
                 sentence_labels.append((labels[i][sentence_begs[i]:sentence_ends[i]]))         
             
-            print(sentence_begs[i], "  ", sentence_ends[i])
             max_num = max([len(a) for a in tmp_x])
             tmp_x = [F.pad(tensor, pad=(0, 0, 0, max_num - tensor.shape[0])) for tensor in tmp_x]
             x = torch.stack(tmp_x)
@@ -185,9 +184,10 @@ class Model(nn.Module):
                 dtype="long", truncating="post")
             labels = np.array(labels)
 
+
         elif self.we_method == 'bert_base' or self.we_method == 'bert_large':
             
-            sentences, labels, sentence_begs, sentence_ends = prepare_bert_roberta(self.params, self.tokenizer, contexts)
+            sentences, labels, sentence_begs, sentence_ends = prepare_bert_roberta(self.params, self.tokenizer, contexts, self.val2id)
 
             attention_mask = (labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)

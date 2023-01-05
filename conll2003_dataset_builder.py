@@ -1,13 +1,7 @@
-# Based on https://colab.research.google.com/github/studio-ousia/luke/blob/master/notebooks/huggingface_conll_2003.ipynb#scrollTo=q9bXAEPZp0ZT
-
-import unicodedata
-
-import numpy as np
 import os
 from collections import Counter
-from tqdm import tqdm, trange
-from transformers import BertTokenizer, RobertaTokenizer, LukeTokenizer
 
+from get_context import get_context_conll2003
 from get_glove import get_glove, create_vocab
 
 
@@ -39,160 +33,44 @@ def load_documents(dataset_file):
     documents = []
     words = []
     labels = []
-    sentence_boundaries = []
+    sentences = []
+    sentences_labels = []
+
     with open(dataset_file) as f:
         for line in f:
             line = line.rstrip()
+            
             if line.startswith("-DOCSTART"):
-                if words:
+                if sentences:
                     documents.append(dict(
-                        words=words,
-                        labels=labels,
-                        sentence_boundaries=sentence_boundaries
+                        sentences=sentences,
+                        sentences_labels=sentences_labels,
                     ))
+                    sentences = []
+                    sentences_labels = []
                     words = []
                     labels = []
-                    sentence_boundaries = []
+
                 continue
 
             if not line:
-                if not sentence_boundaries or len(words) != sentence_boundaries[-1]:
-                    sentence_boundaries.append(len(words))
+                if words:
+                    sentences.append(words)
+                    sentences_labels.append(labels)
+                    words = []
+                    labels = []
             else:
                 items = line.split(" ")
                 words.append(items[0])
                 labels.append(items[-1])
-
-    if words:
+            
+    if sentences:
         documents.append(dict(
-            words=words,
-            labels=labels,
-            sentence_boundaries=sentence_boundaries
+            sentences=sentences,
+            sentences_labels=sentences_labels,
         ))
-        
+
     return documents
-
-
-def load_examples(documents, params):
-    examples = []
-    max_mention_length = 30
-    
-    if params.we_method.lower() == 'bert_base':
-        if params.bert_cased:
-            tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
-        else:
-            tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        params.max_context_len = 510
-    elif params.we_method.lower() == 'bert_large':
-        if params.bert_cased:
-            tokenizer = BertTokenizer.from_pretrained("bert-large-cased")
-        else:
-            tokenizer = BertTokenizer.from_pretrained("bert-large-uncased")
-        params.max_context_len = 510
-    elif params.we_method.lower() == 'roberta':
-        tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
-        params.max_context_len = 510
-    elif params.we_method.lower() == 'luke':
-        tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
-        params.max_context_len = 510
-    elif params.we_method.lower() == 'luke_conll':
-        tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-large-finetuned-conll-2003")
-        params.max_context_len = 510
-    else:
-        params.max_context_len = 2048  
-
-    for document in tqdm(documents):
-        words = document["words"]
-        subword_lengths = [len(tokenizer.tokenize(w)) for w in words]
-        total_subword_length = sum(subword_lengths)
-        sentence_boundaries = document["sentence_boundaries"]
-
-        for i in range(len(sentence_boundaries) - 1):
-            sentence_start, sentence_end = sentence_boundaries[i:i+2]
-            if total_subword_length <= params.max_context_len:
-                # if the total sequence length of the document is shorter than the
-                # maximum token length, we simply use all words to build the sequence
-                context_start = 0
-                context_end = len(words)
-            else:
-                # if the total sequence length is longer than the maximum length, we add
-                # the surrounding words of the target sentence　to the sequence until it
-                # reaches the maximum length
-                context_start = sentence_start
-                context_end = sentence_end
-                cur_length = sum(subword_lengths[context_start:context_end])
-                while True:
-                    if context_start > 0:
-                        if cur_length + subword_lengths[context_start - 1] <= params.max_context_len:
-                            cur_length += subword_lengths[context_start - 1]
-                            context_start -= 1
-                        else:
-                            break
-                    if context_end < len(words):
-                        if cur_length + subword_lengths[context_end] <= params.max_context_len:
-                            cur_length += subword_lengths[context_end]
-                            context_end += 1
-                        else:
-                            break
-
-            text = ""
-            for word in words[context_start:sentence_start]:
-                if word[0] == "'" or (len(word) == 1 and is_punctuation(word)):
-                    text = text.rstrip()
-                text += word
-                text += " "
-
-            sentence_words = words[sentence_start:sentence_end]
-            sentence_subword_lengths = subword_lengths[sentence_start:sentence_end]
-
-            word_start_char_positions = []
-            word_end_char_positions = []
-            for word in sentence_words:
-                if word[0] == "'" or (len(word) == 1 and is_punctuation(word)):
-                    text = text.rstrip()
-                word_start_char_positions.append(len(text))
-                text += word
-                word_end_char_positions.append(len(text))
-                text += " "
-
-            for word in words[sentence_end:context_end]:
-                if word[0] == "'" or (len(word) == 1 and is_punctuation(word)):
-                    text = text.rstrip()
-                text += word
-                text += " "
-            text = text.rstrip()
-
-            entity_spans = []
-            original_word_spans = []
-            for word_start in range(len(sentence_words)):
-                for word_end in range(word_start, len(sentence_words)):
-                    if sum(sentence_subword_lengths[word_start:word_end]) <= max_mention_length:
-                        entity_spans.append(
-                            (word_start_char_positions[word_start], word_end_char_positions[word_end])
-                        )
-                        original_word_spans.append(
-                            (word_start, word_end + 1)
-                        )
-
-            examples.append(dict(
-                text=text,
-                words=sentence_words,
-                entity_spans=entity_spans,
-                original_word_spans=original_word_spans,
-            ))
-
-    return examples
-
-
-def is_punctuation(char):
-    cp = ord(char)
-    if (cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126):
-        return True
-    cat = unicodedata.category(char)
-    if cat.startswith("P"):
-        return True
-    return False
-
 
 
 class Conll2003Dataset(object):
@@ -231,9 +109,9 @@ class Conll2003Dataset(object):
         self.val_documents = load_documents(val_dataset_path)
         self.test_documents = load_documents(test_dataset_path)
 
-        self.train_contexts = load_examples(self.train_documents, params)
-        self.val_contexts = load_examples(self.val_documents, params)
-        self.test_contexts = load_examples(self.test_documents, params)
+        self.train_contexts = get_context_conll2003(self.train_documents, params, self.val2id)
+        self.val_contexts = get_context_conll2003(self.val_documents, params, self.val2id)
+        self.test_contexts = get_context_conll2003(self.test_documents, params, self.val2id)
 
         # Assert sentences and labels lengths:
         assert len(self.train_sentences) == len(self.train_labels)

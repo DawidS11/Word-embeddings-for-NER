@@ -5,6 +5,7 @@ from allennlp.modules.elmo import batch_to_ids
 
 from kaggle_dataset_builder import KaggleDataset
 from conll2003_dataset_builder import Conll2003Dataset
+from conll2003_dataset_builder_for_luke import Conll2003DatasetForLuke
 
 
 class DatasetLoader(object):
@@ -16,7 +17,10 @@ class DatasetLoader(object):
         if params.dataset_name == "kaggle" or params.dataset_name == "kaggle_small":
             self.dataset = KaggleDataset(params)  
         elif params.dataset_name == "conll2003":
-            self.dataset = Conll2003Dataset(params) 
+            if params.we_method == 'luke_conll':
+                self.dataset = Conll2003DatasetForLuke(params) 
+            else:
+                self.dataset = Conll2003Dataset(params) 
         self.val2id = self.dataset.val2id
         self.id2val = self.dataset.id2val
         self.val2id_entity = self.dataset.val2id_entity
@@ -117,7 +121,7 @@ def prepare_elmo(params, contexts):
 
 
 def prepare_bert_roberta(params, tokenizer, contexts):
-    context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]         # [ [], [], ...]
+    context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]       
     context_labels = [contexts[idx]['context_labels'] for idx in range(len(contexts))]
     sentence_begs = [contexts[idx]['sentence_beg'] for idx in range(len(contexts))]
     sentence_ends = [contexts[idx]['sentence_end'] for idx in range(len(contexts))]
@@ -152,7 +156,7 @@ def prepare_bert_roberta(params, tokenizer, contexts):
                 tokenized_sen.append(token)
                 curr_token += 1 
                 if is_first:
-                    tokenized_sen_labels.append(lab[idx_word])
+                    tokenized_sen_labels.append(lab[idx_word])    
                     is_first = False
                 else:
                     tokenized_sen_labels.append(params.pad_tag_num)
