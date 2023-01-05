@@ -6,10 +6,11 @@ class Params():
         self.val_dataset_size = 0.15
         self.test_dataset_size = 0.15       
 
-        self.we_method = 'bert_large' # glove / elmo / bert_base / bert_large / roberta / luke
+        self.we_method = 'luke_conll' # glove / elmo / bert_base / bert_large / roberta / luke
         self.bert_cased = True
+        self.is_finetuned = True
         self.nn_method = 'lstm' # rnn / lstm / cnn
-        self.dataset_name = 'kaggle' # kaggle / conll2003 / kaggle_small
+        self.dataset_name = 'conll2003' # kaggle / conll2003 / kaggle_small / 
 
         self.device = 'cpu' 
         self.seed = 2022  
@@ -56,6 +57,10 @@ class Params():
         self.pad_tag = 'O'
         self.pad_tag_num = -1
         self.unk_word = 'UNK'
+
+
+        word_entity_spans = []
+
 
     def get_device(self):
         return self.device

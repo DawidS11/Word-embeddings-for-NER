@@ -41,6 +41,9 @@ def get_context_conll2003(documents, params, val2id):
     elif params.we_method.lower() == 'luke':
         tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
         params.max_context_len = 510 - 7
+    elif params.we_method.lower() == 'luke_conll':
+        tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-large-finetuned-conll-2003")
+        params.max_context_len = 510 - 7
     else:
         params.max_context_len = 2048                                              
     

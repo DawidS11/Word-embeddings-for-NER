@@ -107,12 +107,6 @@ def prepare_elmo(params, contexts):
 
     max_num = max([len(s) for s in context_labels])
 
-    # padded_sentences = pad_sequences([[s for s in sen] for sen in context_texts],     # batch_to_ids robi padding
-    #         maxlen=max_num, value=params.pad_word, padding="post",      
-    #         dtype=object, truncating="post")
-
-    # padded_sentences = batch_to_ids(padded_sentences)
-
     padded_sentences = batch_to_ids(context_texts)      # robi padding
     
     padded_labels = pad_sequences([[l for l in lab] for lab in context_labels],
@@ -211,28 +205,32 @@ def prepare_luke(params, contexts, tokenizer, id2val, val2id_entity):
     entities = []
     entity_spans = []
     entity_labels = []
+    word_entity_spans = []
     for context in all_entities:
         context_entities = []
         context_spans = []
         context_labels = []
+        context_word_spans = []
         for entity in context:
             context_entities.append(entity['entity_text'])
             context_spans.append(entity['entity_span'])
             context_labels.append(val2id_entity[entity['entity_label']])
+            context_word_spans.append(entity['word_entity_span'])
         entities.append(context_entities)
         entity_spans.append(context_spans)
         entity_labels.append(context_labels)
+        word_entity_spans.append(context_word_spans)
 
-    context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]         # tu nie bedzie sentence?
+    context_texts = [contexts[idx]['context_text'] for idx in range(len(contexts))]       
     texts = [" ".join(sen) for sen in context_texts]
-    inputs = tokenizer(texts, entities=entities, entity_spans=entity_spans, return_tensors="pt", padding=True)
+    inputs = tokenizer(texts, entity_spans=entity_spans, return_tensors="pt", padding=True)     #  entities=entities
 
     max_num = max([len(l) for l in entity_labels])
     entity_labels = pad_sequences([[l for l in lab] for lab in entity_labels],
         maxlen=max_num, value=params.pad_tag_num, padding="post",
         dtype="long", truncating="post")
 
-    return inputs, entity_labels
+    return inputs, entity_labels, word_entity_spans
 
 
 def calc_entity_spans(contexts, id2val):
@@ -247,19 +245,23 @@ def calc_entity_spans(contexts, id2val):
         #labels = context['labels']
         #labels = [id2val[l] for l in context['labels']] 
         labels = [id2val[l] for l in context['context_labels']] 
-        len_labels = len(labels)
+        word_a = 0
+        word_b = 0
 
         for i in range(context['sentence_beg']):            # przesuniecie beg na poczatek zdania w calym tekscie
             beg += len(text[i])                     # lista słów
+            word_a += 1
             
         for idx in range(context['sentence_beg'], context['sentence_end']):
         #for idx in range(len_labels):
             end = beg
+            word_b = word_a
             entity = text[idx]
 
             #for idx2 in range(idx, len_labels):        # context['sentence_end']
             for idx2 in range(idx, context['sentence_end']):
                 end += len(text[idx2])
+                word_b += 1
                 if idx != idx2:
                     entity += " "
                     end += 1
@@ -329,11 +331,12 @@ def calc_entity_spans(contexts, id2val):
                 all_context_entities.append(dict(
                     entity_span=(beg, end), 
                     entity_text=entity,
-                    entity_label=label,                 
+                    entity_label=label,
+                    word_entity_span=(word_a, word_b),                 
                 ))
 
-                
             beg += len(text[idx]) + 1
+            word_a += 1
 
         all_entities.append(all_context_entities)
         all_context_entities = []
