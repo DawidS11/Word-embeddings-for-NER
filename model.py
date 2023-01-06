@@ -70,6 +70,15 @@ class Model(nn.Module):
 
             params.embedding_dim = params.bert_large_dim
 
+        elif self.we_method == 'bert_conll':
+            self.embedding = BertModel.from_pretrained("dslim/bert-base-NER")
+            self.tokenizer = BertTokenizer.from_pretrained("dslim/bert-base-NER")
+
+            for param in self.embedding.parameters():
+                param.requires_grad = False                 
+
+            params.embedding_dim = params.bert_base_dim
+
         elif self.we_method == 'roberta':
             self.embedding = RobertaModel.from_pretrained("roberta-base")
             self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
@@ -185,9 +194,9 @@ class Model(nn.Module):
             labels = np.array(labels)
 
 
-        elif self.we_method == 'bert_base' or self.we_method == 'bert_large':
+        elif self.we_method == 'bert_base' or self.we_method == 'bert_large' or self.we_method == 'bert_conll':
             
-            sentences, labels, sentence_begs, sentence_ends = prepare_bert_roberta(self.params, self.tokenizer, contexts, self.val2id)
+            sentences, labels, sentence_begs, sentence_ends = prepare_bert_roberta(self.params, self.tokenizer, contexts)
 
             attention_mask = (labels >= 0)
             attention_mask = torch.FloatTensor(attention_mask)

@@ -35,15 +35,18 @@ def get_context_conll2003(documents, params, val2id):
         else:
             tokenizer = BertTokenizer.from_pretrained("bert-large-uncased")
         params.max_context_len = 510
+    elif params.we_method == 'bert_conll':
+        tokenizer = BertTokenizer.from_pretrained("dslim/bert-base-NER")
+        params.max_context_len = 510
     elif params.we_method.lower() == 'roberta':
         tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
         params.max_context_len = 510
     elif params.we_method.lower() == 'luke':
         tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
-        params.max_context_len = 510 - 7
+        params.max_context_len = 510
     elif params.we_method.lower() == 'luke_conll':
         tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-large-finetuned-conll-2003")
-        params.max_context_len = 510 - 7
+        params.max_context_len = 510
     else:
         params.max_context_len = 2048                                              
     

@@ -17,7 +17,7 @@ class DatasetLoader(object):
         if params.dataset_name == "kaggle" or params.dataset_name == "kaggle_small":
             self.dataset = KaggleDataset(params)  
         elif params.dataset_name == "conll2003":
-            if params.we_method == 'luke_conll':
+            if params.we_method == 'luke' or params.we_method == 'luke_conll':
                 self.dataset = Conll2003DatasetForLuke(params) 
             else:
                 self.dataset = Conll2003Dataset(params) 

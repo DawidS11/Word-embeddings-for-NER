@@ -179,13 +179,13 @@ def load_examples(documents, params):
                         )
 
             examples.append(dict(
-                context_text=text,
-                sentence=sentence_words,
+                text=text,
+                words=sentence_words,
                 entity_spans=entity_spans,
                 original_word_spans=original_word_spans,
-                sentence_beg=sentence_start-context_start,
-                sentence_end=sentence_end-context_start,
-                context_labels=document_labels[context_start:context_end]
+                # sentence_beg=sentence_start-context_start,
+                # sentence_end=sentence_end-context_start,
+                # context_labels=document_labels[context_start:context_end]
             ))
 
     return examples
