@@ -141,8 +141,6 @@ def load_examples(documents, params):
 
             text = ""
             for word in words[context_start:sentence_start]:
-                # if word[0] == "'" or (len(word) == 1 and is_punctuation(word)):
-                #     text = text.rstrip()
                 text += word
                 text += " "
 
@@ -152,16 +150,12 @@ def load_examples(documents, params):
             word_start_char_positions = []
             word_end_char_positions = []
             for word in sentence_words:
-                # if word[0] == "'" or (len(word) == 1 and is_punctuation(word)):
-                #     text = text.rstrip()
                 word_start_char_positions.append(len(text))
                 text += word
                 word_end_char_positions.append(len(text))
                 text += " "
 
             for word in words[sentence_end:context_end]:
-                # if word[0] == "'" or (len(word) == 1 and is_punctuation(word)):
-                #     text = text.rstrip()
                 text += word
                 text += " "
             text = text.rstrip()
@@ -183,23 +177,9 @@ def load_examples(documents, params):
                 words=sentence_words,
                 entity_spans=entity_spans,
                 original_word_spans=original_word_spans,
-                # sentence_beg=sentence_start-context_start,
-                # sentence_end=sentence_end-context_start,
-                # context_labels=document_labels[context_start:context_end]
             ))
 
     return examples
-
-
-def is_punctuation(char):
-    cp = ord(char)
-    if (cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126):
-        return True
-    cat = unicodedata.category(char)
-    if cat.startswith("P"):
-        return True
-    return False
-
 
 
 class Conll2003DatasetForLuke(object):
@@ -223,7 +203,7 @@ class Conll2003DatasetForLuke(object):
         self.val_sentences, self.val_labels = load_dataset(val_dataset_path)
         self.test_sentences, self.test_labels = load_dataset(test_dataset_path)
 
-        # Creating a number representation of labels.
+        # Creating a number representation of labels:
         dataset_labels = self.train_labels + self.val_labels + self.test_labels
         list_labels = [l for lab in dataset_labels for l in lab]
         tags_vals = list(set(list_labels))

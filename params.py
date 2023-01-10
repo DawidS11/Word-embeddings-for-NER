@@ -6,10 +6,9 @@ class Params():
         self.val_dataset_size = 0.15
         self.test_dataset_size = 0.15       
 
-        self.we_method = 'luke_conll' # glove / elmo / bert_base / bert_large / roberta / luke
+        self.we_method = 'bert_base' # glove / elmo / bert_base / bert_large / roberta / luke
         self.bert_cased = True
-        self.is_finetuned = True
-        self.nn_method = 'lstm' # rnn / lstm / cnn
+        self.nn_method = 'lstm' # / lstm / cnn
         self.dataset_name = 'conll2003' # kaggle / conll2003 / kaggle_small / 
 
         self.device = 'cpu' 
@@ -30,15 +29,15 @@ class Params():
         self.roberta_dim = 768       
         self.luke_dim = 768                 
 
-        # self.data_dir = 'data/conll2003/' # 'data/kaggle/' 'data/conll2003/'
-        # self.glove_dir = 'data/glove/'  
-        # self.elmo_dir = 'data/elmo/'
+        self.data_dir = 'data/conll2003/' # 'data/kaggle/' 'data/conll2003/'
+        self.glove_dir = 'data/glove/'  
+        self.elmo_dir = 'data/elmo/'
         # self.data_dir = '/content/'  
         # self.glove_dir = '/content/' 
         # self.elmo_dir = '/content/' 
-        self.data_dir = '/notebooks/'  
-        self.glove_dir = '/notebooks/'  
-        self.elmo_dir = '/notebooks/' 
+        # self.data_dir = '/notebooks/'  
+        # self.glove_dir = '/notebooks/'  
+        # self.elmo_dir = '/notebooks/' 
 
         self.elmo_options_file = "elmo_2x2048_256_2048cnn_1xhighway_options.json"
         self.elmo_weight_file = "elmo_2x2048_256_2048cnn_1xhighway_weights.hdf5"
@@ -52,15 +51,11 @@ class Params():
         self.max_entity_num = 0
         self.vocab_size = 0
 
-        self.max_context_len = 510  # maksymalny dla bert i roberta to 512 (510 + znaki początku i końca)
+        self.max_context_len = 510
         self.pad_word = 'P'
         self.pad_tag = 'O'
         self.pad_tag_num = -1
         self.unk_word = 'UNK'
-
-
-        word_entity_spans = []
-
 
     def get_device(self):
         return self.device

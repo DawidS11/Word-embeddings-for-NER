@@ -1,10 +1,6 @@
 import warnings
 warnings.filterwarnings('ignore')  # "error", "ignore", "always", "default", "module" or "once"
 
-import os
-
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
 import numpy as np
 import torch
 import torch.optim as optim
@@ -34,12 +30,8 @@ def stats(outputs, labels):
 
     f1 = sklearn.metrics.f1_score(labels_not_masked, outputs_not_masked, average='micro')
 
-    if my_params.we_method.lower() == 'luke':
-        labels_vals = [id2val_entity[label] if label < my_params.num_of_tags_entity else 'NIL' for label in labels_not_masked]
-        outputs_vals = [id2val_entity[output] if output < my_params.num_of_tags_entity else 'NIL' for output in outputs_not_masked]
-    else:
-        labels_vals = [id2val[label] if label < my_params.num_of_tags else 'O' for label in labels_not_masked]
-        outputs_vals = [id2val[output] if output < my_params.num_of_tags else 'O' for output in outputs_not_masked]
+    labels_vals = [id2val[label] if label < my_params.num_of_tags else 'O' for label in labels_not_masked]
+    outputs_vals = [id2val[output] if output < my_params.num_of_tags else 'O' for output in outputs_not_masked]
         
     return accuracy, f1, labels_vals, outputs_vals
 
@@ -48,7 +40,7 @@ def loss_fun(outputs, labels):
     labels = labels.ravel()         # (1D: batch_size*seq_len)
     mask = (labels >= 0).float()
     
-    #labels = labels % outputs.shape[1]     # nie dziala z device="mps"
+    #labels = labels % outputs.shape[1]     # does not work with device="mps"
     labels2 = []
     for l in labels:
         labels2.append(l.item() % outputs.shape[1])
@@ -98,7 +90,6 @@ def evaluate(model, criterion, data_eval_iterator, num_batches, show_table):
     if show_table:
         labels_without_O = [l for l in val2id.keys() if l != 'O']
         print("\nEvaluation table: \n\n", sklearn.metrics.classification_report(flat_labels, flat_outputs, digits=4, labels=labels_without_O))
-        #print("Evaluation accuracy: ", sklearn.metrics.accuracy_score(flat_labels, flat_outputs, labels=labels_without_O))
         print("Evaluation f1_score micro: ", sklearn.metrics.f1_score(flat_labels, flat_outputs, average='micro', labels=labels_without_O), "\n\n")
         
         print("\nEvaluation table: \n\n", seqeval.metrics.classification_report([flat_labels], [flat_outputs], digits=4))
@@ -126,7 +117,7 @@ def train(model, optimizer, criterion, data_train_iterator, num_batches):
     for batch in batches:
 
         sentences, labels, contexts = next(data_train_iterator)
-        outputs, labels = model(sentences, labels, contexts)            # W modelu padding labels do najdluzszego zdania w batch.
+        outputs, labels = model(sentences, labels, contexts)            
 
         labels = torch.LongTensor(labels)
         labels = labels.to(device=my_params.device)
@@ -179,7 +170,6 @@ if __name__ == '__main__':
     data_train = dataset_loader.load_data("train")
     data_val = dataset_loader.load_data("val")
 
-    #model = Model(my_params, id2val, val2id, val2id_entity).cuda() if my_params.cuda else Model(my_params, id2val, val2id, val2id_entity)
     model = Model(my_params, id2val, val2id, id2val_entity, val2id_entity).to(device=my_params.device)
     optimizer = optim.Adam(model.parameters(), lr=my_params.learning_rate)
  
@@ -199,7 +189,7 @@ if __name__ == '__main__':
 
         start_train_time = time.time()
         # Training:
-        num_batches = (my_params.train_size + 1) // my_params.train_batch_size           # number of batches in one epoch
+        num_batches = (my_params.train_size + 1) // my_params.train_batch_size          
         data_train_iterator = dataset_loader.data_iterator(data_train, my_params.train_size, my_params.train_batch_size, my_params, shuffle=True)
         avg_loss, avg_acc, avg_f1_score = train(model, optimizer, criterion, data_train_iterator, num_batches)
 

@@ -9,7 +9,7 @@ from transformers import RobertaTokenizer, RobertaModel
 from transformers import LukeTokenizer, LukeForEntitySpanClassification
 from keras_preprocessing.sequence import pad_sequences
 
-from dataset_loader import prepare_glove, prepare_elmo, prepare_bert_roberta, prepare_luke
+from dataset_loader import prepare_glove, prepare_elmo, prepare_bert_roberta
 
 class Model(nn.Module):
 
@@ -24,7 +24,6 @@ class Model(nn.Module):
         self.dropout = nn.Dropout(params.dropout)
 
         self.we_method = params.we_method.lower()
-
         if self.we_method == 'glove':
             self.word2id = np.load(os.path.join(params.glove_dir, 'word2id.npy'), allow_pickle=True).tolist()
             self.embedding = nn.Embedding(params.vocab_size, params.glove_dim)
@@ -70,15 +69,6 @@ class Model(nn.Module):
 
             params.embedding_dim = params.bert_large_dim
 
-        elif self.we_method == 'bert_conll':
-            self.embedding = BertModel.from_pretrained("dslim/bert-base-NER")
-            self.tokenizer = BertTokenizer.from_pretrained("dslim/bert-base-NER")
-
-            for param in self.embedding.parameters():
-                param.requires_grad = False                 
-
-            params.embedding_dim = params.bert_base_dim
-
         elif self.we_method == 'roberta':
             self.embedding = RobertaModel.from_pretrained("roberta-base")
             self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
@@ -89,15 +79,6 @@ class Model(nn.Module):
             params.embedding_dim = params.roberta_dim
 
         elif self.we_method == 'luke':
-            self.embedding = LukeForEntitySpanClassification.from_pretrained("studio-ousia/luke-base")
-            self.tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
-
-            for param in self.embedding.parameters():
-                param.requires_grad = False                 
-
-            params.embedding_dim = params.luke_dim
-
-        elif self.we_method == 'luke_conll':
             self.embedding = LukeForEntitySpanClassification.from_pretrained("studio-ousia/luke-large-finetuned-conll-2003")
             self.tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-large-finetuned-conll-2003")
 
@@ -106,12 +87,9 @@ class Model(nn.Module):
 
             params.embedding_dim = params.luke_dim
 
-
         else:
             print("init: we_method nie zostala wybrana.")
-        
-        if params.is_finetuned:
-            params.embedding_dim = 1
+
 
         self.nn_method = params.nn_method.lower()
         if self.nn_method == 'lstm':
@@ -128,10 +106,7 @@ class Model(nn.Module):
         else:
             print("init: nn_method nie zostala wybrana. ")
 
-        if self.we_method == 'luke':
-            self.fc = nn.Linear(params.hidden_dim, params.num_of_tags_entity)
-        else:
-            self.fc = nn.Linear(params.hidden_dim, params.num_of_tags)
+        self.fc = nn.Linear(params.hidden_dim, params.num_of_tags)
         nn.init.uniform_(self.fc.weight, -0.5, 0.5)
         nn.init.uniform_(self.fc.bias, -0.1, 0.1)
 
@@ -148,7 +123,7 @@ class Model(nn.Module):
             x = self.embedding(inputs)
             del inputs
 
-            # Bierze pod uwagę tylko zdanie, nie caly kontekst:
+            # Considers only the sentence, not its context:
             tmp_x = []
             sentence_labels = []
             for i in range(len(sentence_begs)):
@@ -176,7 +151,7 @@ class Model(nn.Module):
             x = self.embedding(inputs)['elmo_representations'][0]
             del inputs
 
-            # Bierze pod uwagę tylko zdanie, nie caly kontekst:
+            # Considers only the sentence, not its context:
             tmp_x = []
             sentence_labels = []
             for i in range(len(sentence_begs)):
@@ -194,21 +169,21 @@ class Model(nn.Module):
             labels = np.array(labels)
 
 
-        elif self.we_method == 'bert_base' or self.we_method == 'bert_large' or self.we_method == 'bert_conll':
+        elif self.we_method == 'bert_base' or self.we_method == 'bert_large':
             
-            sentences, labels, sentence_begs, sentence_ends = prepare_bert_roberta(self.params, self.tokenizer, contexts)
+            inputs, labels, sentence_begs, sentence_ends = prepare_bert_roberta(self.params, self.tokenizer, contexts)
 
-            attention_mask = (labels >= 0)
+            attention_mask = (labels > self.params.pad_tag_num)
             attention_mask = torch.FloatTensor(attention_mask)
             attention_mask = attention_mask.to(device=self.params.device)
 
-            inputs = torch.LongTensor(sentences)
+            inputs = torch.LongTensor(inputs)
             inputs = inputs.to(device=self.params.device)
 
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
             del inputs
 
-            # Bierze pod uwagę tylko zdanie, nie caly kontekst:
+            # Considers only the sentence, not its context:
             tmp_x = []
             sentence_labels = []
             for i in range(len(sentence_begs)):
@@ -239,7 +214,7 @@ class Model(nn.Module):
             x = self.embedding(inputs, attention_mask=attention_mask)[0]
             del inputs
 
-            # Bierze pod uwagę tylko zdanie, nie caly kontekst:
+            # Considers only the sentence, not its context:
             tmp_x = []
             sentence_labels = []
             for i in range(len(sentence_begs)):
@@ -256,13 +231,7 @@ class Model(nn.Module):
             labels = np.array(labels)
 
 
-        elif self.we_method == 'luke' or self.we_method == 'luke_conll':
-            
-            # sentences, labels, self.params.word_entity_spans = prepare_luke(self.params, contexts, self.tokenizer, self.id2val, self.val2id_entity)
-
-            # inputs = sentences.to(device=self.params.device)
-            # outputs = self.embedding(**inputs)        #['entity_last_hidden_state']
-            # del inputs
+        elif self.we_method == 'luke':
 
             texts = [example["text"] for example in contexts]
             entity_spans = [example["entity_spans"] for example in contexts]
@@ -281,10 +250,10 @@ class Model(nn.Module):
                 original_spans = example["original_word_spans"]
                 predictions = []
                 for logit, index, span in zip(max_logits, max_indices, original_spans):
-                    if index != 0:  # the span is not NIL
+                    if index != 0:  # The span is not NIL.
                         predictions.append((logit, span, self.embedding.config.id2label[index]))
 
-                # construct an IOB2 label sequence
+                # Construct an IOB2 label sequence:
                 predicted_sequence = ["O"] * len(example["words"])
                 for _, span, label in sorted(predictions, key=lambda o: o[0], reverse=True):
                     if all([o == "O" for o in predicted_sequence[span[0] : span[1]]]):
@@ -304,25 +273,24 @@ class Model(nn.Module):
 
             x = torch.FloatTensor(x)
             x = x.to(device=self.params.device)
-            x = torch.unsqueeze(x, dim=-1)          # Dodanie wymiaru, o rozmiarze 1, który odpowiada za embedding - w tym przypadku id labela
+
+            # Adding a dimension that in other cases is an embedding, here it is label's id:
+            x = torch.unsqueeze(x, dim=-1)         
             
         else:
-            print("forward: we_method nie zostala wybrana. ")
+            print("forward: we_method is not correct. ")
 
 
         if self.nn_method == 'lstm':
             x, _ = self.lstm(x)
 
-        elif self.nn_method == 'rnn':
-            x, _ = self.rnn(x)
-        
         elif self.nn_method == 'cnn':
             x = x.unsqueeze(1)
             x = F.relu(self.conv(x).squeeze(3))
             x = x.permute(0, 2, 1)
 
         else:
-            print("forward: nn_method nie zostala wybrana")
+            print("forward: nn_method  is not correct. ")
 
         x = x.contiguous()
         x = x.view(-1, x.shape[2])

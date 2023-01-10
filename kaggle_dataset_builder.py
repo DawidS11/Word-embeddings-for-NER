@@ -47,7 +47,7 @@ class KaggleDataset(object):
 
         self.dataset_sentences = [" ".join([s[0] for s in sent]) for sent in sentences.sentences]
 
-        random.shuffle(sentences.sentences)
+        #random.shuffle(sentences.sentences)
         self.dataset_sentences = [[s[0] for s in sen] for sen in sentences.sentences]
         self.dataset_labels  = [[s[2] for s in sen] for sen in sentences.sentences]
         
@@ -68,11 +68,20 @@ class KaggleDataset(object):
         assert len(self.val_sentences) == len(self.val_labels)
         assert len(self.test_sentences) == len(self.test_labels)
 
+        print("per ", per)
+        print("org ", org)
+        print("gpe ", gpe)
+        print("geo ", geo)
+        print("nat ", nat)
+        print("eve ", eve)
+        print("tim ", tim)
+        print("art ", art)
+
         params.train_size = len(self.train_sentences)
         params.val_size = len(self.val_sentences)
         params.test_size = len(self.test_sentences)
 
-        # Creating a number representation of labels.
+        # Creating a number representation of labels:
         tags_vals = list(set(dataset_pd["Tag"].values))
         tags_vals_entity = list(set([tag_val[2:] if tag_val != 'O' else 'NIL' for tag_val in tags_vals]))
 

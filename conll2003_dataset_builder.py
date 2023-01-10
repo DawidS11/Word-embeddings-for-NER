@@ -94,7 +94,7 @@ class Conll2003Dataset(object):
         self.val_sentences, self.val_labels = load_dataset(val_dataset_path)
         self.test_sentences, self.test_labels = load_dataset(test_dataset_path)
 
-        # Creating a number representation of labels.
+        # Creating a number representation of labels:
         dataset_labels = self.train_labels + self.val_labels + self.test_labels
         list_labels = [l for lab in dataset_labels for l in lab]
         tags_vals = list(set(list_labels))
@@ -104,7 +104,7 @@ class Conll2003Dataset(object):
         self.id2val = {i: t for i, t in enumerate(tags_vals)}
         self.val2id_entity = {t: i for i, t in enumerate(tags_vals_entity)}
         self.id2val_entity = {i: t for i, t in enumerate(tags_vals_entity)}
-
+        
         self.train_documents = load_documents(train_dataset_path)
         self.val_documents = load_documents(val_dataset_path)
         self.test_documents = load_documents(test_dataset_path)

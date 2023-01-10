@@ -1,7 +1,7 @@
 from transformers import BertTokenizer, RobertaTokenizer, LukeTokenizer
 
 '''
-Dla kazdego zdania przypisywany jest kontekst. W przypadku kaggle, jest to tylko to zdanie, w przypadku conll2003 jest to maksymalnie dokument, w ktorym zdanie sie znajduje.
+Each sentence has its context. In case of Kaggle dataset, it is only that sentence since the dataset is not divided into documents.
 '''
 
 def get_context_kaggle(sentences, labels, val2id):
@@ -35,17 +35,8 @@ def get_context_conll2003(documents, params, val2id):
         else:
             tokenizer = BertTokenizer.from_pretrained("bert-large-uncased")
         params.max_context_len = 510
-    elif params.we_method == 'bert_conll':
-        tokenizer = BertTokenizer.from_pretrained("dslim/bert-base-NER")
-        params.max_context_len = 510
     elif params.we_method.lower() == 'roberta':
         tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
-        params.max_context_len = 510
-    elif params.we_method.lower() == 'luke':
-        tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-base")
-        params.max_context_len = 510
-    elif params.we_method.lower() == 'luke_conll':
-        tokenizer = LukeTokenizer.from_pretrained("studio-ousia/luke-large-finetuned-conll-2003")
         params.max_context_len = 510
     else:
         params.max_context_len = 2048                                              
@@ -57,14 +48,14 @@ def get_context_conll2003(documents, params, val2id):
         labels_flat = sum(document["sentences_labels"], [])
         text_labels = [val2id[lab] for lab in labels_flat]
         if params.we_method.lower() == 'glove' or params.we_method.lower() == 'elmo':
-            subword_lengths = [len(w) for w in sentences_flat]                          # liczba znaków
+            subword_lengths = [len(w) for w in sentences_flat]                          # number of characters
         else:
-            subword_lengths = [len(tokenizer.tokenize(w)) for w in sentences_flat]      # liczba tokenów
+            subword_lengths = [len(tokenizer.tokenize(w)) for w in sentences_flat]      # number of tokens
         total_subword_length = sum(subword_lengths)
 
         sentence_beg = 0     
         sentence_end = 0
-        for sen, lab in zip(document["sentences"], document["sentences_labels"]):           # sen - lista słów
+        for sen, lab in zip(document["sentences"], document["sentences_labels"]):
             lab = [val2id[l] for l in lab]
             sentence_end += len(sen)                        
             if not sen:
@@ -104,10 +95,10 @@ def get_context_conll2003(documents, params, val2id):
                         labels=lab,
                         context_text=sentences_flat[context_beg:context_end],
                         context_labels=text_labels[context_beg:context_end],
-                        sentence_beg=sentence_beg-context_beg,                  # -context_beg zeby wskazac poczatek zdania w context_text
-                        sentence_end=sentence_end-context_beg,                 
+                        sentence_beg=sentence_beg-context_beg,                  # -context_beg in order to point the beginning of the sentence in context_text
+                        sentence_end=sentence_end-context_beg,                   
                     ))
 
-            sentence_beg += len(sen)            # liczba słów, nie znaków
+            sentence_beg += len(sen)
             
     return contexts
