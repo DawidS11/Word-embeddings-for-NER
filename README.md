@@ -1,7 +1,7 @@
 # Word-embeddings-for-NER
 
 
-A program comparing the impact of word embeddings in a Named Entity Recognition (NER) task.
+A program that compares the impact of word embeddings in the Named Entity Recognition (NER) task.
 Models for embeddings in use: GloVe, ELMo, BERT, RoBERTa. 
 Also, finetuned on CoNLL-2003 LUKE is used, to compare the results of entity-focused model. Note that the program does not use the embeddings created by LUKE, but predicted types of entities.
 
